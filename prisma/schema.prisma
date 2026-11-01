@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  RESPONSABLE
+  TRESORIERE
+  SECRETAIRE
+}
+
+enum StatutEnfant {
+  ACTIF
+  INACTIF
+}
+
+enum EtatPresence {
+  PRESENT
+  PERMISSION
+  ABSENT
+}
+
+enum ClasseEcole {
+  AVANT_CM1
+  CM1
+  CM2
+  SIXIEME
+  CINQUIEME
+  QUATRIEME
+  TROISIEME
+  SECONDE
+  PREMIERE
+  TERMINALE
+  SUPERIEUR
+  TERMINEE
+}
+
+enum ClasseCatechisme {
+  ANNEE_1
+  ANNEE_2
+  ANNEE_3
+  ANNEE_4
+  ANNEE_5
+  TERMINE
+}
+
+model Groupe {
+  id                  String       @id @default(cuid())
+  nom                 String
+  slug                String       @unique
+  // Paramètres (règle 6)
+  moisDebutAnnee      Int          @default(10) // octobre
+  moisSansReunion     Int[]        @default([7, 8, 9]) // juil., août, sept.
+  premierDimanche     DateTime
+  montantCotisation   Int          @default(100)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  fraternites         Fraternite[]
+  enfants             Enfant[]
+  utilisateurs        User[]
+  presences           Presence[]
+  cotisations         Cotisation[]
+  historiques         Historique[]
+}
+
+model Fraternite {
+  id        String   @id @default(cuid())
+  nom       String
+  groupeId  String
+  groupe    Groupe   @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+
+  enfants   Enfant[]
+  utilisateurs User[]
+
+  @@unique([groupeId, nom])
+}
+
+model User {
+  id            String      @id @default(cuid())
+  nom           String
+  email         String      @unique
+  passwordHash   String
+  role          Role
+  groupeId      String
+  groupe        Groupe      @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+  fraterniteId  String?
+  fraternite    Fraternite? @relation(fields: [fraterniteId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  historiques   Historique[]
+}
+
+model Enfant {
+  id                String            @id @default(cuid())
+  numero            Int // LJ-001 -> 1, jamais réutilisé
+  nom               String // MAJUSCULES
+  prenoms           String
+  dateNaissance     DateTime
+  cleDoublon        String // nom+prenoms+date, normalisé
+  classeEcole       ClasseEcole
+  serie             String? // null => "(série non précisée)"
+  classeCatechisme  ClasseCatechisme
+  telephoneParent   String?
+  statut            StatutEnfant      @default(ACTIF)
+  fraterniteId      String
+  fraternite        Fraternite        @relation(fields: [fraterniteId], references: [id], onDelete: Cascade)
+  groupeId          String
+  groupe            Groupe            @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+
+  presences         Presence[]
+  cotisations       Cotisation[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([groupeId, cleDoublon])
+  @@unique([groupeId, numero])
+  @@index([groupeId, fraterniteId, statut])
+}
+
+model Presence {
+  id        String        @id @default(cuid())
+  enfantId  String
+  enfant    Enfant        @relation(fields: [enfantId], references: [id], onDelete: Cascade)
+  date      DateTime
+  etat      EtatPresence  @default(ABSENT)
+  groupeId  String
+  groupe    Groupe        @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([enfantId, date])
+  @@index([groupeId, date])
+}
+
+model Cotisation {
+  id        String   @id @default(cuid())
+  enfantId  String
+  enfant    Enfant   @relation(fields: [enfantId], references: [id], onDelete: Cascade)
+  date      DateTime
+  montant   Int      @default(0)
+  groupeId  String
+  groupe    Groupe   @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([enfantId, date])
+  @@index([groupeId, date])
+}
+
+model Historique {
+  id             String   @id @default(cuid())
+  action         String
+  details        String?
+  utilisateurId  String?
+  utilisateur    User?    @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
+  groupeId       String
+  groupe         Groupe   @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([groupeId, createdAt])
+}
