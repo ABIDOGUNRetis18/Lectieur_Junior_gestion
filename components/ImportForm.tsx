@@ -279,18 +279,29 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
 
         <div className="space-y-space-xs">
           <label className="block font-label-md text-label-md text-on-surface">Fichier</label>
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={onFile}
-            className="w-full"
-          />
-          {fileName && (
-            <p className="font-body-sm text-on-surface-variant">
-              Fichier : {fileName}
-              {excelRows && ` — ${excelRows.length} ligne(s) détectée(s)`}
-            </p>
-          )}
+          <div className="relative rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest hover:border-primary hover:bg-surface-container-low transition-all">
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={onFile}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            />
+            <div className="flex flex-col items-center justify-center gap-space-xs py-space-lg px-space-md text-center pointer-events-none">
+              <span className="material-symbols-outlined text-[32px] text-primary">upload_file</span>
+              <p className="font-label-md text-label-md text-on-surface">
+                Cliquez ou glissez un fichier ici
+              </p>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                CSV, Excel (.xlsx) ou PDF — max 5 Mo
+              </p>
+              {fileName && (
+                <p className="font-label-md text-label-md text-secondary mt-1">
+                  ✅ {fileName}
+                  {excelRows && ` — ${excelRows.length} ligne(s) détectée(s)`}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         <button
