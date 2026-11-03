@@ -165,7 +165,7 @@ export default function ConsultationView({ data }: { data: Data }) {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant">
-                <th className="text-left p-2 font-label-md">Nom</th>
+                <th className="text-left p-2 font-label-md sticky left-0 bg-surface-container-lowest z-10">Nom</th>
                 <th className="text-left p-2 font-label-md">Prénoms</th>
                 {data.dimanches.map((d) => (
                   <th key={d} className="p-2 font-label-sm text-center">{d.slice(8)}</th>
@@ -180,7 +180,7 @@ export default function ConsultationView({ data }: { data: Data }) {
                 const b = data.bilan[e.id];
                 return (
                   <tr key={e.id} className="border-b border-outline-variant/50">
-                    <td className="p-2 font-body-md">{e.nom}</td>
+                    <td className="p-2 font-body-md sticky left-0 bg-surface-container-lowest z-10">{e.nom}</td>
                     <td className="p-2 font-body-md">{e.prenoms}</td>
                     {data.dimanches.map((d) => {
                       const etat = data.presenceMap[e.id]?.[d];
@@ -235,7 +235,7 @@ export default function ConsultationView({ data }: { data: Data }) {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-outline-variant">
-              <th className="text-left p-2 font-label-md">Nom</th>
+              <th className="text-left p-2 font-label-md sticky left-0 bg-surface-container-lowest z-10">Nom</th>
               <th className="text-left p-2 font-label-md">Prénoms</th>
               <th className="p-2 font-label-sm text-center">Présents</th>
               <th className="p-2 font-label-sm text-center">Permissions</th>
@@ -249,7 +249,7 @@ export default function ConsultationView({ data }: { data: Data }) {
               const b = data.bilan[e.id];
               return (
                 <tr key={e.id} className="border-b border-outline-variant/50">
-                  <td className="p-2 font-body-md">{e.nom}</td>
+                  <td className="p-2 font-body-md sticky left-0 bg-surface-container-lowest z-10">{e.nom}</td>
                   <td className="p-2 font-body-md">{e.prenoms}</td>
                   <td className="p-2 text-center">{b?.present ?? 0}</td>
                   <td className="p-2 text-center">{b?.permission ?? 0}</td>

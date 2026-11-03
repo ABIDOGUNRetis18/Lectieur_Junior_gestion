@@ -14,7 +14,6 @@ const ROLE_LABEL: Record<string, string> = {
 
 const NAV = [
   { href: "/enfants", label: "Enfants", icon: "groups" },
-  { href: "/inscription", label: "Inscription", icon: "person_add" },
   { href: "/presence", label: "Présence", icon: "fact_check" },
   { href: "/cotisation", label: "Cotisation", icon: "payments" },
   { href: "/consultation", label: "Consultation", icon: "menu_book" },
@@ -36,7 +35,7 @@ export default function AppShell({
     <div className="flex flex-col min-h-screen bg-surface">
       {/* Top App Bar */}
       <header className="fixed top-0 w-full z-50 pt-safe bg-primary/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.12)]">
-        <div className="h-20 px-margin flex items-center justify-between gap-space-sm max-w-lg mx-auto">
+        <div className="h-16 px-margin flex items-center justify-between gap-space-sm max-w-lg mx-auto">
           <div className="flex items-center gap-space-sm min-w-0 flex-1">
             <Link href="/tableau-de-bord" className="flex items-center gap-space-sm min-w-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -91,7 +90,7 @@ export default function AppShell({
         </div>
       </header>
 
-      <main className="flex flex-col relative w-full pt-20 pb-24 bg-surface min-h-screen">
+      <main className="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen">
         <div className="flex flex-col w-full pb-28">{children}</div>
       </main>
 
