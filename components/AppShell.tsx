@@ -7,8 +7,6 @@ import Link from "next/link";
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrateur",
   RESPONSABLE: "Responsable",
-  SECRETAIRE: "Secrétaire",
-  TRESORIERE: "Trésorière",
   FRATERNITE: "Fraternité",
 };
 
@@ -30,6 +28,7 @@ export default function AppShell({
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const roleLabel = ROLE_LABEL[role] ?? role;
+  const isAdmin = role === "ADMIN";
 
   return (
     <div className="flex flex-col min-h-screen bg-surface">
@@ -97,7 +96,10 @@ export default function AppShell({
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
         <div className="flex justify-around items-stretch h-16 px-space-xs max-w-lg mx-auto">
-          {NAV.map((item) => {
+          {[
+            ...NAV,
+            ...(isAdmin ? [{ href: "/historique", label: "Historique", icon: "history" }] : []),
+          ].map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <a

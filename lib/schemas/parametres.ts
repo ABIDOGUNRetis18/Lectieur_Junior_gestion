@@ -9,8 +9,6 @@ export const MOIS_NOMS = [
 export const ROLES = [
   { value: "ADMIN", label: "Administrateur" },
   { value: "RESPONSABLE", label: "Responsable (fraternité)" },
-  { value: "TRESORIERE", label: "Trésorière" },
-  { value: "SECRETAIRE", label: "Secrétaire" },
 ] as const;
 
 const moisInt = z.coerce
@@ -62,7 +60,7 @@ export const compteCreateSchema = z
       .string()
       .min(8, "8 caractères minimum")
       .max(128, "128 caractères maximum"),
-    role: z.enum(["ADMIN", "RESPONSABLE", "TRESORIERE", "SECRETAIRE"]),
+    role: z.enum(["ADMIN", "RESPONSABLE"]),
     fraterniteId: z.string().optional().nullable(),
   })
   .superRefine((d, ctx) => {
@@ -80,7 +78,7 @@ export type CompteCreateInput = z.infer<typeof compteCreateSchema>;
 /** Modification d'un compte (rôle + fraternité). */
 export const compteUpdateSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(["ADMIN", "RESPONSABLE", "TRESORIERE", "SECRETAIRE"]),
+  role: z.enum(["ADMIN", "RESPONSABLE"]),
   fraterniteId: z.string().optional().nullable(),
 });
 

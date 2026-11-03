@@ -57,8 +57,6 @@ async function main() {
 
   const demos = [
     { nom: "Responsable Frat 2", email: "responsable@paroisse.bj", role: "RESPONSABLE", fraternite: "Fraternité 2" },
-    { nom: "Secrétaire", email: "secretaire@paroisse.bj", role: "SECRETAIRE", fraternite: null },
-    { nom: "Trésorière", email: "tresoriere@paroisse.bj", role: "TRESORIERE", fraternite: null },
   ];
   for (const d of demos) {
     await prisma.user.upsert({

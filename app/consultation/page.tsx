@@ -14,7 +14,7 @@ export default async function ConsultationPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireRole("ADMIN", "SECRETAIRE", "TRESORIERE", "RESPONSABLE");
+  await requireRole("ADMIN", "RESPONSABLE");
   const groupe = await getGroupeCourant();
   const params = await searchParams;
   const annee = params.annee ? Number(params.annee) : new Date().getFullYear();

@@ -22,7 +22,7 @@ export default async function CotisationPage() {
     }));
   }
 
-  // TRESORIERE sees all fraternities; ADMIN too
+  // RESPONSABLE sees all fraternities; ADMIN too
   return (
     <AppShell title="Cotisation">
       <CotisationForm

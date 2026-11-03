@@ -6,7 +6,7 @@ import AppShell from "@/components/AppShell";
 import EnfantFiche from "@/components/EnfantFiche";
 
 export default async function EnfantFichePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("ADMIN", "RESPONSABLE", "SECRETAIRE", "TRESORIERE");
+  await requireRole("ADMIN", "RESPONSABLE");
   const { id } = await params;
   const enfant = await getEnfantWithDetails(id);
   const fraternites = await getFraternites();

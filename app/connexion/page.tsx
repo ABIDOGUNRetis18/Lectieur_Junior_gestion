@@ -6,13 +6,6 @@ import { signIn } from "next-auth/react";
 
 import { Suspense } from "react";
 
-const PROFILS = [
-  { icon: "menu_book", color: "text-primary", name: "Responsable" },
-  { icon: "account_balance_wallet", color: "text-secondary", name: "Trésorerie" },
-  { icon: "check_circle", color: "text-surface-tint", name: "Secrétariat" },
-  { icon: "admin_panel_settings", color: "text-primary-container", name: "Admin" },
-];
-
 function ConnexionForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -174,24 +167,6 @@ function ConnexionForm() {
             </button>
           </div>
         </form>
-
-        {/* Role Missions Guidance */}
-        <div className="pt-space-xs space-y-space-xs text-center">
-          <p className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">
-            Profils autorisés
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {PROFILS.map((p) => (
-              <span
-                key={p.name}
-                className="inline-flex items-center space-x-1 px-space-sm py-1 rounded-full bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm border border-surface-container-high"
-              >
-                <span className={`material-symbols-outlined text-[13px] ${p.color}`}>{p.icon}</span>
-                <span>{p.name}</span>
-              </span>
-            ))}
-          </div>
-        </div>
 
         {/* Support & Pastoral Office Footer Note */}
         <footer className="text-center pt-space-md pb-space-lg space-y-1 text-on-surface-variant/80">

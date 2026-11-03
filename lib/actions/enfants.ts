@@ -202,7 +202,7 @@ export async function exporterDonneesEnfantAction(enfantId: string): Promise<
   | { ok: false; error: string }
 > {
   const session = await requireAuth();
-  if (!["ADMIN", "RESPONSABLE", "SECRETAIRE", "TRESORIERE"].includes(session.user.role)) {
+  if (!["ADMIN", "RESPONSABLE"].includes(session.user.role)) {
     return { ok: false, error: "Accès refusé." };
   }
 

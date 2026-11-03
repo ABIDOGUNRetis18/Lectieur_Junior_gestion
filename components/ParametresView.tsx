@@ -83,7 +83,7 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
   const [cNom, setCNom] = useState("");
   const [cEmail, setCEmail] = useState("");
   const [cPwd, setCPwd] = useState("");
-  const [cRole, setCRole] = useState("SECRETAIRE");
+  const [cRole, setCRole] = useState("RESPONSABLE");
   const [cFrat, setCFrat] = useState("");
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<{
