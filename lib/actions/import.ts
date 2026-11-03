@@ -218,15 +218,17 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
     return { ok: false, error: "Accès refusé.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
   }
 
-  // Fraternité cible (fallback)
-  let cibleFrat;
-  try {
-    cibleFrat = await assertFraterniteInGroup(fraterniteId, session.user.groupeId);
-  } catch {
-    return { ok: false, error: "Fraternité introuvable.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
-  }
-  if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== fraterniteId) {
-    return { ok: false, error: "Vous ne pouvez importer que dans votre fraternité.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  // Fraternité cible (optionnelle, utilisée si le fichier n'en précise pas)
+  let cibleFrat: { id: string; nom: string } | null = null;
+  if (fraterniteId) {
+    try {
+      cibleFrat = await assertFraterniteInGroup(fraterniteId, session.user.groupeId);
+    } catch {
+      return { ok: false, error: "Fraternité introuvable.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+    }
+    if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== fraterniteId) {
+      return { ok: false, error: "Vous ne pouvez importer que dans votre fraternité.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+    }
   }
 
   const rows = parseCsv(csvText);
@@ -297,7 +299,11 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
       else serie = `Autre: ${serieTrimmed}`;
     }
 
-    const fraterniteNom = fratRaw.trim() || cibleFrat.nom;
+    const fraterniteNom = fratRaw.trim() || (cibleFrat ? cibleFrat.nom : "");
+    if (!fraterniteNom) {
+      parseErrors.push({ ligne, message: "Fraternité manquante (colonne 'Fraternité' absente et aucune fraternité cible sélectionnée)." });
+      continue;
+    }
     const statut = /inactif/i.test(statutRaw) ? "INACTIF" : "ACTIF";
 
     parsed.push({
@@ -345,14 +351,16 @@ export async function importerExcelAction(rows: ExcelRow[], fraterniteId: string
     return { ok: false, error: "Accès refusé.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
   }
 
-  let cibleFrat;
-  try {
-    cibleFrat = await assertFraterniteInGroup(fraterniteId, session.user.groupeId);
-  } catch {
-    return { ok: false, error: "Fraternité introuvable.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
-  }
-  if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== fraterniteId) {
-    return { ok: false, error: "Vous ne pouvez importer que dans votre fraternité.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  let cibleFrat: { id: string; nom: string } | null = null;
+  if (fraterniteId) {
+    try {
+      cibleFrat = await assertFraterniteInGroup(fraterniteId, session.user.groupeId);
+    } catch {
+      return { ok: false, error: "Fraternité introuvable.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+    }
+    if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== fraterniteId) {
+      return { ok: false, error: "Vous ne pouvez importer que dans votre fraternité.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+    }
   }
 
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -400,7 +408,11 @@ export async function importerExcelAction(rows: ExcelRow[], fraterniteId: string
       else serie = `Autre: ${serieTrimmed}`;
     }
 
-    const fraterniteNom = String(row.fraternite ?? "").trim() || cibleFrat.nom;
+    const fraterniteNom = String(row.fraternite ?? "").trim() || (cibleFrat ? cibleFrat.nom : "");
+    if (!fraterniteNom) {
+      parseErrors.push({ ligne, message: "Fraternité manquante (colonne 'Fraternité' absente et aucune fraternité cible sélectionnée)." });
+      continue;
+    }
     const statut = /inactif/i.test(String(row.statut ?? "")) ? "INACTIF" : "ACTIF";
 
     parsed.push({

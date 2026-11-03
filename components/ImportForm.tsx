@@ -10,6 +10,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
   const [fraterniteId, setFraterniteId] = useState(fraternites[0]?.id ?? "");
   const [csvText, setCsvText] = useState("");
   const [excelRows, setExcelRows] = useState<ExcelRow[] | null>(null);
+  const [hasFraterniteColumn, setHasFraterniteColumn] = useState(false);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -29,6 +30,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
       if (raw.length === 0) {
         setExcelRows([]);
         setCsvText("");
+        setHasFraterniteColumn(false);
         return;
       }
       const headers = Object.keys(raw[0]);
@@ -61,10 +63,17 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
       });
       setExcelRows(rows);
       setCsvText("");
+      setHasFraterniteColumn(headerMap["fraternite"] !== undefined);
     } else {
       const text = await file.text();
       setCsvText(text);
       setExcelRows(null);
+      // detect fraternite column in CSV header
+      const firstLine = text.split(/\\r?\\n/)[0];
+      // quick parse not full; reuse mapHeaders on split
+      const cols = firstLine.split(",");
+      const hm = mapHeaders(cols);
+      setHasFraterniteColumn(hm["fraternite"] !== undefined);
     }
   }
 
@@ -99,18 +108,28 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
           TERMINE). Les valeurs non reconnues sont signalées.
         </p>
 
-        <div className="space-y-space-xs">
-          <label className="block font-label-md text-label-md text-on-surface">Fraternité cible (par défaut)</label>
-          <select
-            className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
-            value={fraterniteId}
-            onChange={(e) => setFraterniteId(e.target.value)}
-          >
-            {fraternites.map((f) => (
-              <option key={f.id} value={f.id}>{f.nom}</option>
-            ))}
-          </select>
-        </div>
+        {!hasFraterniteColumn && (
+          <div className="space-y-space-xs">
+            <label className="block font-label-md text-label-md text-on-surface">Fraternité cible (par défaut)</label>
+            <select
+              className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
+              value={fraterniteId}
+              onChange={(e) => setFraterniteId(e.target.value)}
+            >
+              {fraternites.map((f) => (
+                <option key={f.id} value={f.id}>{f.nom}</option>
+              ))}
+            </select>
+            <p className="font-body-sm text-on-surface-variant">
+              Le fichier ne contient pas de colonne « Fraternité » : tous les enfants seront rattachés à cette fraternité.
+            </p>
+          </div>
+        )}
+        {hasFraterniteColumn && (
+          <p className="font-body-sm text-on-surface-variant">
+            La colonne « Fraternité » du fichier est utilisée pour chaque enfant.
+          </p>
+        )}
 
         <div className="space-y-space-xs">
           <label className="block font-label-md text-label-md text-on-surface">Fichier</label>
