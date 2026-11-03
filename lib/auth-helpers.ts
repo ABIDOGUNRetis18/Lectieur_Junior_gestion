@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
-export type Role = "ADMIN" | "RESPONSABLE" | "TRESORIERE" | "SECRETAIRE";
+export type Role = "ADMIN" | "RESPONSABLE";
 
 export async function getSession() {
   return await auth();

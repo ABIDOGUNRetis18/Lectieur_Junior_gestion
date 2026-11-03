@@ -43,6 +43,16 @@ export default function EnfantsList({ enfants, fraternites, filters }: Props) {
         onSubmit={apply}
         className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm"
       >
+        <div className="flex items-center justify-between gap-space-sm">
+          <h2 className="font-headline-sm text-headline-sm text-primary">Filtres</h2>
+          <Link
+            href="/inscription"
+            className="inline-flex items-center gap-space-xs h-[40px] px-space-sm rounded-lg bg-primary-container text-on-primary font-label-sm text-label-sm"
+          >
+            <span className="material-symbols-outlined text-[16px]">person_add</span>
+            <span>Inscrire</span>
+          </Link>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
           <input
             className="h-[44px] rounded-lg border border-outline-variant px-space-sm font-body-md"

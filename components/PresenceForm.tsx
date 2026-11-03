@@ -18,8 +18,14 @@ type Props = {
 
 const ETAT_LABEL: Record<string, string> = {
   PRESENT: "Présent",
-  PERMISSION: "Perm",
+  PERMISSION: "Excusé",
   ABSENT: "Absent",
+};
+
+const ETAT_LETTER: Record<string, string> = {
+  PRESENT: "P",
+  PERMISSION: "E",
+  ABSENT: "A",
 };
 
 const ETAT_COLOR: Record<string, string> = {
@@ -158,17 +164,19 @@ export default function PresenceForm({ fraternites, dimanches, enfantsByFrat }: 
                     </p>
                     <p className="font-body-sm text-body-sm text-on-surface-variant">{e.classeEcole}</p>
                   </div>
-                  <div className="flex gap-space-xs">
+                  <div className="flex gap-1 rounded-lg bg-surface-container p-1">
                     {(["PRESENT", "PERMISSION", "ABSENT"] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
                         onClick={() => setEtat(e.id, st)}
-                        className={`min-w-[48px] h-[40px] rounded-lg font-label-sm text-label-sm uppercase transition-all ${
-                          etat === st ? ETAT_COLOR[st] : "bg-surface-container-high text-on-surface"
+                        title={ETAT_LABEL[st]}
+                        aria-label={ETAT_LABEL[st]}
+                        className={`min-w-[40px] h-[36px] rounded-md font-label-md text-label-md transition-all ${
+                          etat === st ? ETAT_COLOR[st] + " shadow-sm" : "text-on-surface-variant hover:bg-surface-container-lowest"
                         }`}
                       >
-                        {ETAT_LABEL[st]}
+                        {ETAT_LETTER[st]}
                       </button>
                     ))}
                   </div>

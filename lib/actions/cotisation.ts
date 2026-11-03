@@ -19,7 +19,7 @@ export async function enregistrerCotisationAction(input: {
   payes: string[];
 }) {
   const session = await requireAuth();
-  if (!["ADMIN", "TRESORIERE"].includes(session.user.role)) {
+  if (!["ADMIN", "RESPONSABLE"].includes(session.user.role)) {
     return { ok: false, error: "Accès refusé." };
   }
 

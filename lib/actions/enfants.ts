@@ -1,18 +1,138 @@
 "use server";
 
-import { requireAuth, requireRole } from "@/lib/auth-helpers";
+import { requireAuth } from "@/lib/auth-helpers";
 import { assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { CLASSES_ECOLE, CLASSES_CATECHISME, SERIES } from "@/lib/schemas/inscription";
 
 export type EnfantActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-function canManage(role: string, enfantFraterniteId: string, userFraterniteId: string | null) {
-  if (role === "ADMIN") return true;
-  if (role === "RESPONSABLE" && userFraterniteId === enfantFraterniteId) return true;
-  return false;
+const classeEcoleEnum = z.enum([
+  "AVANT_CM1", "CM1", "CM2", "SIXIEME", "CINQUIEME", "QUATRIEME",
+  "TROISIEME", "SECONDE", "PREMIERE", "TERMINALE", "SUPERIEUR", "TERMINEE",
+]);
+const classeCatechismeEnum = z.enum([
+  "ANNEE_1", "ANNEE_2", "ANNEE_3", "ANNEE_4", "ANNEE_5", "TERMINE",
+]);
+
+const modifierSchema = z.object({
+  enfantId: z.string().min(1),
+  nom: z.string().min(1, "Nom requis").max(100),
+  prenoms: z.string().min(1, "Prénoms requis").max(100),
+  dateNaissance: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide"),
+  classeEcole: classeEcoleEnum,
+  serie: z.string().optional().nullable(),
+  classeCatechisme: classeCatechismeEnum,
+  telephoneParent: z.string().optional().nullable(),
+  fraterniteId: z.string().min(1),
+});
+
+export type ModifierEnfantResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+export async function modifierEnfantAction(input: z.infer<typeof modifierSchema>): Promise<ModifierEnfantResult> {
+  const session = await requireAuth();
+  if (!["ADMIN", "RESPONSABLE"].includes(session.user.role)) {
+    return { ok: false, error: "Accès refusé." };
+  }
+
+  const parsed = modifierSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Données invalides.",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    };
+  }
+  const data = parsed.data;
+
+  const enfant = await prisma.enfant.findFirst({
+    where: { id: data.enfantId, groupeId: session.user.groupeId },
+    include: { fraternite: true },
+  });
+  if (!enfant) return { ok: false, error: "Enfant introuvable." };
+
+  if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== enfant.fraterniteId) {
+    return { ok: false, error: "Vous ne pouvez modifier que les enfants de votre fraternité." };
+  }
+
+  // New fraternity must belong to group
+  try {
+    await assertFraterniteInGroup(data.fraterniteId, session.user.groupeId);
+  } catch {
+    return { ok: false, error: "Fraternité introuvable." };
+  }
+  if (session.user.role === "RESPONSABLE" && data.fraterniteId !== session.user.fraterniteId) {
+    return { ok: false, error: "Vous ne pouvez pas changer la fraternité." };
+  }
+
+  // Normalize
+  const nom = data.nom.trim().toUpperCase();
+  const prenoms = data.prenoms
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+
+  // Anti-doublon check (if identity changed)
+  const dateNaissance = new Date(data.dateNaissance);
+  const newCle = `${nom.toLowerCase()}|${prenoms.toLowerCase()}|${dateNaissance.toISOString().slice(0, 10)}`;
+  if (newCle !== enfant.cleDoublon) {
+    const existing = await prisma.enfant.findUnique({
+      where: { groupeId_cleDoublon: { groupeId: session.user.groupeId, cleDoublon: newCle } },
+    });
+    if (existing && existing.id !== enfant.id) {
+      return { ok: false, error: "Un autre enfant avec ces informations existe déjà." };
+    }
+  }
+
+  // Série handling
+  let serie: string | null = null;
+  if (["SECONDE", "PREMIERE", "TERMINALE"].includes(data.classeEcole)) {
+    if (data.serie && data.serie !== "AUTRE") serie = data.serie;
+    else if (data.serie === "AUTRE") serie = data.serie; // keep as AUTRE if not specified
+  }
+
+  const changes: string[] = [];
+  if (enfant.nom !== nom) changes.push(`nom: ${enfant.nom} → ${nom}`);
+  if (enfant.prenoms !== prenoms) changes.push(`prénoms: ${enfant.prenoms} → ${prenoms}`);
+  if (enfant.classeEcole !== data.classeEcole) changes.push(`classe: ${enfant.classeEcole} → ${data.classeEcole}`);
+  if (enfant.classeCatechisme !== data.classeCatechisme) changes.push(`catéchisme: ${enfant.classeCatechisme} → ${data.classeCatechisme}`);
+  if ((enfant.telephoneParent ?? "") !== (data.telephoneParent?.trim() ?? "")) changes.push("téléphone modifié");
+  if (enfant.fraterniteId !== data.fraterniteId) changes.push("fraternité modifiée");
+
+  await prisma.enfant.update({
+    where: { id: enfant.id },
+    data: {
+      nom,
+      prenoms,
+      dateNaissance,
+      cleDoublon: newCle,
+      classeEcole: data.classeEcole as any,
+      serie,
+      classeCatechisme: data.classeCatechisme as any,
+      telephoneParent: data.telephoneParent?.trim() || null,
+      fraterniteId: data.fraterniteId,
+    },
+  });
+
+  await prisma.historique.create({
+    data: {
+      action: "ENFANT_MODIFIE",
+      details: `${nom} ${prenoms} (LJ-${String(enfant.numero).padStart(3, "0")}) modifié${changes.length ? " — " + changes.join(", ") : ""}`,
+      utilisateurId: session.user.id,
+      groupeId: session.user.groupeId,
+    },
+  });
+
+  return { ok: true, message: "Enfant modifié." };
 }
+
+// ---------- Statut / suppression / export ----------
 
 export async function changerStatutEnfantAction(
   enfantId: string,
@@ -28,14 +148,12 @@ export async function changerStatutEnfantAction(
     include: { fraternite: true },
   });
   if (!enfant) return { ok: false, error: "Enfant introuvable." };
-  if (!canManage(session.user.role, enfant.fraterniteId, session.user.fraterniteId)) {
-    return { ok: false, error: "Vous ne pouvez agir que dans votre fraternité." };
-  }
+  const canManage =
+    session.user.role === "ADMIN" ||
+    (session.user.role === "RESPONSABLE" && session.user.fraterniteId === enfant.fraterniteId);
+  if (!canManage) return { ok: false, error: "Vous ne pouvez agir que dans votre fraternité." };
 
-  await prisma.enfant.update({
-    where: { id: enfant.id },
-    data: { statut: nouveauStatut },
-  });
+  await prisma.enfant.update({ where: { id: enfant.id }, data: { statut: nouveauStatut } });
 
   await prisma.historique.create({
     data: {
@@ -60,9 +178,10 @@ export async function supprimerEnfantAction(enfantId: string): Promise<EnfantAct
     include: { fraternite: true },
   });
   if (!enfant) return { ok: false, error: "Enfant introuvable." };
-  if (!canManage(session.user.role, enfant.fraterniteId, session.user.fraterniteId)) {
-    return { ok: false, error: "Vous ne pouvez agir que dans votre fraternité." };
-  }
+  const canManage =
+    session.user.role === "ADMIN" ||
+    (session.user.role === "RESPONSABLE" && session.user.fraterniteId === enfant.fraterniteId);
+  if (!canManage) return { ok: false, error: "Vous ne pouvez agir que dans votre fraternité." };
 
   await prisma.enfant.delete({ where: { id: enfant.id } });
 
@@ -97,11 +216,7 @@ export async function exporterDonneesEnfantAction(enfantId: string): Promise<
   });
   if (!enfant) return { ok: false, error: "Enfant introuvable." };
 
-  // RESPONSABLE : sa fraternité uniquement
-  if (
-    session.user.role === "RESPONSABLE" &&
-    session.user.fraterniteId !== enfant.fraterniteId
-  ) {
+  if (session.user.role === "RESPONSABLE" && session.user.fraterniteId !== enfant.fraterniteId) {
     return { ok: false, error: "Accès refusé à cette fraternité." };
   }
 
@@ -121,14 +236,8 @@ export async function exporterDonneesEnfantAction(enfantId: string): Promise<
       createdAt: enfant.createdAt.toISOString(),
       updatedAt: enfant.updatedAt.toISOString(),
     },
-    presences: enfant.presences.map((p) => ({
-      date: p.date.toISOString().slice(0, 10),
-      etat: p.etat,
-    })),
-    cotisations: enfant.cotisations.map((c) => ({
-      date: c.date.toISOString().slice(0, 10),
-      montant: c.montant,
-    })),
+    presences: enfant.presences.map((p) => ({ date: p.date.toISOString().slice(0, 10), etat: p.etat })),
+    cotisations: enfant.cotisations.map((c) => ({ date: c.date.toISOString().slice(0, 10), montant: c.montant })),
     exporteLe: new Date().toISOString(),
   };
 

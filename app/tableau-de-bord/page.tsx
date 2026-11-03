@@ -64,13 +64,13 @@ export default async function TableauDeBordPage() {
           <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
             <h2 className="font-headline-sm text-headline-sm text-primary">Importer le registre existant</h2>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Reprise des enfants depuis un fichier CSV (avec détection des doublons).
+              Reprise des enfants depuis un fichier CSV ou Excel (avec détection des doublons).
             </p>
             <a
               href="/import"
               className="inline-flex h-[44px] items-center px-space-md rounded-lg bg-primary-container text-on-primary font-label-md"
             >
-              Ouvrir l&apos;import CSV
+              Ouvrir l&apos;import
             </a>
           </section>
         )}

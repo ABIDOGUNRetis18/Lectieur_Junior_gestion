@@ -1,7 +1,7 @@
 export const instant = false;
 
 import { requireRole } from "@/lib/auth-helpers";
-import { getEnfantWithDetails } from "@/lib/dal";
+import { getEnfantWithDetails, getFraternites } from "@/lib/dal";
 import AppShell from "@/components/AppShell";
 import EnfantFiche from "@/components/EnfantFiche";
 
@@ -9,6 +9,7 @@ export default async function EnfantFichePage({ params }: { params: Promise<{ id
   await requireRole("ADMIN", "RESPONSABLE", "SECRETAIRE", "TRESORIERE");
   const { id } = await params;
   const enfant = await getEnfantWithDetails(id);
+  const fraternites = await getFraternites();
   if (!enfant) {
     return (
       <AppShell title="Enfant introuvable">
@@ -46,6 +47,7 @@ export default async function EnfantFichePage({ params }: { params: Promise<{ id
             montant: c.montant,
           })),
         }}
+        fraternites={fraternites.map((f) => ({ id: f.id, nom: f.nom }))}
       />
     </AppShell>
   );
