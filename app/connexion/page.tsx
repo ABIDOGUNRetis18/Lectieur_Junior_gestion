@@ -168,6 +168,16 @@ function ConnexionForm() {
           </div>
         </form>
 
+        {/* Bouton retour accueil */}
+        <button
+          type="button"
+          onClick={() => router.push("/tableau-de-bord")}
+          className="w-full h-[52px] min-h-[52px] border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center space-x-1 gap-space-sm"
+        >
+          <span className="material-symbols-outlined text-[18px]">home</span>
+          Retour à l'accueil
+        </button>
+
         {/* Support & Pastoral Office Footer Note */}
         <footer className="text-center pt-space-md pb-space-lg space-y-1 text-on-surface-variant/80">
           <p className="font-body-sm text-body-sm text-outline">
