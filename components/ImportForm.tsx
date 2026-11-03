@@ -108,7 +108,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
           TERMINE). Les valeurs non reconnues sont signalées.
         </p>
 
-        {!hasFraterniteColumn && (
+        {!hasFraterniteColumn && fileName && (
           <div className="space-y-space-xs">
             <label className="block font-label-md text-label-md text-on-surface">Fraternité cible (par défaut)</label>
             <select
@@ -125,7 +125,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
             </p>
           </div>
         )}
-        {hasFraterniteColumn && (
+        {hasFraterniteColumn && fileName && (
           <p className="font-body-sm text-on-surface-variant">
             La colonne « Fraternité » du fichier est utilisée pour chaque enfant.
           </p>
