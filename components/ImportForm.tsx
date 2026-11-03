@@ -72,27 +72,8 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
         setResult({ ok: false, error: "Aucun en-tête de tableau détecté dans le PDF.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] });
         return;
       }
-      // Header columns: filter out space-only items, use x positions as boundaries
+      // Header columns: filter out space-only items
       const headerItems = lineItems[headerLineIdx].filter((it) => it.str.trim().length > 0);
-      const boundaries: number[] = [];
-      for (let i = 0; i < headerItems.length; i++) {
-        const cur = headerItems[i];
-        const next = headerItems[i + 1];
-        const curEnd = cur.x + cur.w;
-        if (next) {
-          boundaries.push((curEnd + next.x) / 2);
-        } else {
-          boundaries.push(Infinity);
-        }
-      }
-      function colIndex(x: number): number {
-        let idx = 0;
-        for (let i = 0; i < headerItems.length; i++) {
-          if (x + 20 >= headerItems[i].x) idx = i;
-          else break;
-        }
-        return idx;
-      }
       const headerCols = headerItems.map((it) => it.str);
       const { mapHeaders } = await import("@/lib/csv");
       const hm = mapHeaders(headerCols);
@@ -101,9 +82,6 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
       for (let li = headerLineIdx + 1; li < lineItems.length; li++) {
         const items = lineItems[li];
         if (items.length === 0) continue;
-        const tokens = items.map((it) => it.str.trim()).filter((t) => t.length > 0);
-        if (tokens.length < 3) continue;
-        // Type-based classification (robust to column misalignment in PDFs)
         let dateNaissance = "";
         let classeEcole = "";
         let classeCatechisme = "";
@@ -111,37 +89,63 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
         let fraternite = "";
         let statut = "";
         const rest: string[] = [];
-        for (const tok of tokens) {
-          if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(tok) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(tok)) {
-            if (!dateNaissance) dateNaissance = tok;
-            else rest.push(tok);
-          } else if (/^\d{8,15}$/.test(tok.replace(/\s/g, ""))) {
-            if (!telephoneParent) telephoneParent = tok;
-            else rest.push(tok);
-          } else if (/^fraternit/i.test(tok)) {
-            // "Fraternité 1" may be split; accumulate following number
-            fraternite = tok;
-          } else if (/^actif$/i.test(tok) || /^inactif$/i.test(tok)) {
-            statut = tok;
+        for (const it of items) {
+          let raw = it.str.trim();
+          if (!raw) continue;
+          if (/^LJ-\d+$/i.test(raw)) continue;
+          const dateMatch = raw.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/);
+          if (dateMatch && !dateNaissance) {
+            dateNaissance = dateMatch[0];
+            raw = raw.replace(dateMatch[0], "").trim();
+          }
+          const phoneMatch = raw.match(/\d{8,15}/);
+          if (phoneMatch && !telephoneParent) {
+            telephoneParent = phoneMatch[0];
+            raw = raw.replace(phoneMatch[0], "").trim();
+          }
+          if (!raw) continue;
+          let classified = false;
+          if (/^fraternit/i.test(raw)) {
+            if (!fraternite) { fraternite = raw; classified = true; }
+          } else if (/^actif$/i.test(raw) || /^inactif$/i.test(raw)) {
+            if (!statut) { statut = raw; classified = true; }
+          } else if (/^ann[ée]e?s?$/i.test(raw)) {
+            classified = true;
           } else {
-            const eco = CLASSE_ECOLE_MAP[normalizeHeader(tok)];
-            const cat = CLASSE_CAT_MAP[normalizeHeader(tok)];
-            if (eco && !classeEcole) classeEcole = tok;
-            else if (cat && !classeCatechisme) classeCatechisme = tok;
-            else rest.push(tok);
+            const eco = CLASSE_ECOLE_MAP[normalizeHeader(raw)] || CLASSE_ECOLE_MAP[normalizeHeader(raw).replace(/\s+/g, "")];
+            const cat = CLASSE_CAT_MAP[normalizeHeader(raw)] || CLASSE_CAT_MAP[normalizeHeader(raw).replace(/\s+/g, "")];
+            if (eco && !classeEcole) { classeEcole = raw; classified = true; }
+            else if (cat && !classeCatechisme) { classeCatechisme = raw; classified = true; }
+          }
+          if (classified) continue;
+          for (const tok of raw.split(/\s+/)) {
+            if (!tok) continue;
+            if (/^LJ-\d+$/i.test(tok)) continue;
+            if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(tok) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(tok)) {
+              if (!dateNaissance) dateNaissance = tok;
+            } else if (/^\d{8,15}$/.test(tok)) {
+              if (!telephoneParent) telephoneParent = tok;
+              else rest.push(tok);
+            } else if (/^fraternit/i.test(tok)) {
+              if (!fraternite) fraternite = tok;
+              else rest.push(tok);
+            } else if (/^actif$/i.test(tok) || /^inactif$/i.test(tok)) {
+              if (!statut) statut = tok;
+              else rest.push(tok);
+            } else if (/^ann[ée]e?s?$/i.test(tok)) {
+            } else {
+              const eco = CLASSE_ECOLE_MAP[normalizeHeader(tok)] || CLASSE_ECOLE_MAP[normalizeHeader(tok).replace(/\s+/g, "")];
+              const cat = CLASSE_CAT_MAP[normalizeHeader(tok)] || CLASSE_CAT_MAP[normalizeHeader(tok).replace(/\s+/g, "")];
+              if (eco && !classeEcole) classeEcole = tok;
+              else if (cat && !classeCatechisme) classeCatechisme = tok;
+              else rest.push(tok);
+            }
+          }
+          if (fraternite && !/\d/.test(fraternite)) {
+            const idx = rest.findIndex((t) => /^\d+$/.test(t));
+            if (idx !== -1) fraternite = fraternite + " " + rest.splice(idx, 1)[0];
           }
         }
-        // Handle "Fraternité 1" split into two tokens: if a token is "Fraternité" and next is a number
-        // Re-scan rest for fraternite number
-        // (already handled partially; check rest for trailing number after fraternite)
-        if (fraternite && !/\d/.test(fraternite)) {
-          // find a number in rest that follows
-          const idx = rest.findIndex((t) => /^\d+$/.test(t));
-          if (idx !== -1) {
-            fraternite = fraternite + " " + rest.splice(idx, 1)[0];
-          }
-        }
-        // nom = first rest token, prenoms = rest joined
         const nom = rest.length > 0 ? rest[0] : "";
         const prenoms = rest.slice(1).join(" ");
         if (!nom && !prenoms) continue;
@@ -150,13 +154,14 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
           nom,
           prenoms,
           dateNaissance,
-          classeEcole: classeEcole, // raw text; server maps to enum
+          classeEcole,
           serie: "",
-          classeCatechisme: classeCatechisme, // raw text; server maps to enum
+          classeCatechisme,
           telephoneParent,
           statut,
         });
       }
+
       setExcelRows(rows);
       setCsvText("");
       setHasFraterniteColumn(false);
