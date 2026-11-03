@@ -35,11 +35,17 @@ const emptyRow: ChildRow = {
 
 export default function InscriptionForm({
   fraternites,
+  soleUniqueFrat,
 }: {
   fraternites: { id: string; nom: string }[];
+  soleUniqueFrat?: boolean;
 }) {
   const router = useRouter();
-  const [fraterniteId, setFraterniteId] = useState(fraternites[0]?.id ?? "");
+  const [fraterniteId, setFraterniteId] = useState(
+    soleUniqueFrat && fraternites.length === 1
+      ? fraternites[0].id
+      : fraternites[0]?.id ?? ""
+  );
   const [consentement, setConsentement] = useState(false);
   const [rows, setRows] = useState<ChildRow[]>([{ ...emptyRow }]);
   const [loading, setLoading] = useState(false);
@@ -99,6 +105,7 @@ export default function InscriptionForm({
           className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
           value={fraterniteId}
           onChange={(e) => setFraterniteId(e.target.value)}
+          disabled={soleUniqueFrat && fraternites.length === 1}
         >
           {fraternites.map((f) => (
             <option key={f.id} value={f.id}>{f.nom}</option>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 import { Suspense } from "react";
+import Image from "next/image";
 
 function ConnexionForm() {
   const router = useRouter();
@@ -42,11 +43,13 @@ function ConnexionForm() {
         {/* Brand & Parish Header */}
         <header className="flex flex-col items-center text-center pt-space-md pb-space-xs space-y-space-sm">
           <div className="w-20 h-20 rounded-2xl overflow-hidden bg-surface-container flex items-center justify-center shadow-sm border border-surface-container-highest/60">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               alt="Logo Paroisse Saint-Michel Gbeto"
               className="w-full h-full object-cover"
               src="/logo-saint-michel-carre.webp"
+              width={80}
+              height={80}
+              priority
             />
           </div>
           <div className="space-y-1">

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrateur",

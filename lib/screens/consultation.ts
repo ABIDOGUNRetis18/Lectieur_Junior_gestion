@@ -506,30 +506,6 @@ export const html = `
 </button>
 </div>
 
-<div class="bg-surface-container rounded-xl p-space-md flex flex-col gap-space-xs">
-<div class="flex items-center justify-between">
-<div class="flex items-center gap-1.5">
-<span class="material-symbols-outlined text-[18px] text-primary">science</span>
-<span class="font-label-sm text-label-sm text-on-surface font-bold uppercase tracking-wider">Simulateur d'états système</span>
-</div>
-<span class="font-label-sm text-label-sm text-on-surface-variant">Secrétariat</span>
-</div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">
-        Basculez entre les cas réels de chargement et les situations sans données pour valider l'expérience terrain :
-      </p>
-<div class="grid grid-cols-3 gap-1.5 mt-1">
-<button class="state-btn py-1.5 px-2 rounded-lg font-label-sm text-label-sm bg-primary text-on-primary transition-all" id="btnStateReal">
-          Données (Normal)
-        </button>
-<button class="state-btn py-1.5 px-2 rounded-lg font-label-sm text-label-sm bg-surface-container-high text-on-surface transition-all" id="btnStateSkeleton">
-          Chargement
-        </button>
-<button class="state-btn py-1.5 px-2 rounded-lg font-label-sm text-label-sm bg-surface-container-high text-on-surface transition-all" id="btnStateEmpty">
-          État vide
-        </button>
-</div>
-</div>
-</div>
 </div>
 
 `;

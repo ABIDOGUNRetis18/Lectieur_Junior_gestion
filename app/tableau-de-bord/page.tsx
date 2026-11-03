@@ -1,8 +1,8 @@
 import { requireAuth } from "@/lib/auth-helpers";
 import { getGroupeCourant, getFraternites, getEnfantsActifs } from "@/lib/dal";
-export const instant = false;
 
 import AppShell from "@/components/AppShell";
+import Link from "next/link";
 
 export default async function TableauDeBordPage() {
   const session = await requireAuth();
@@ -38,10 +38,30 @@ export default async function TableauDeBordPage() {
         </section>
 
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-xs">
-          <h2 className="font-headline-sm text-headline-sm text-primary">Enfants actifs</h2>
-          <p className="font-body-md text-body-md text-on-surface">
-            {enfants.length} enfant(s) actif(s) dans le groupe.
-          </p>
+          <h2 className="font-headline-sm text-headline-sm text-primary">
+            Enfants actifs ({enfants.length})
+          </h2>
+          {enfants.length === 0 ? (
+            <p className="font-body-sm text-on-surface-variant">Aucun enfant actif dans le groupe.</p>
+          ) : (
+            <ul className="divide-y divide-outline-variant/50 max-h-96 overflow-y-auto">
+              {enfants.map((e) => (
+                <li key={e.id} className="py-space-xs flex items-center justify-between gap-space-sm font-body-sm">
+                  <Link
+                    href={`/enfants/${e.id}`}
+                    className="font-body-md text-on-surface font-semibold hover:text-primary truncate block min-w-0 flex-1"
+                  >
+                    LJ-{String(e.numero).padStart(3, "0")} — {e.nom} {e.prenoms}
+                  </Link>
+                  <span
+                    className={`font-label-sm text-label-sm ${e.fraterniteId ? "text-on-surface-variant" : "text-error"}`}
+                  >
+                    {e.fraternite?.nom ?? "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {session.user.role === "ADMIN" && (

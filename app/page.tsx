@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const PILIERS = [
   {
@@ -40,10 +41,13 @@ export default function Home() {
           <div className="flex items-center gap-space-sm">
             <div className="w-9 h-9 rounded-lg overflow-hidden bg-primary-container flex items-center justify-center flex-shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 alt="Logo Paroisse Saint-Michel Gbeto"
                 className="w-full h-full object-cover"
                 src="/logo-saint-michel-carre.webp"
+                width={80}
+                height={80}
+                priority
               />
             </div>
             <div className="flex flex-col">
