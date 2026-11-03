@@ -86,6 +86,29 @@ export function normalizeHeader(h: string): string {
     .trim();
 }
 
+export const CLASSE_ECOLE_MAP: Record<string, string> = {
+  "avant le cm1": "AVANT_CM1", "avant cm1": "AVANT_CM1", "cm1": "CM1", "cm2": "CM2",
+  "6eme": "SIXIEME", "6ème": "SIXIEME", "sixieme": "SIXIEME", "6e": "SIXIEME",
+  "5eme": "CINQUIEME", "5ème": "CINQUIEME", "cinquieme": "CINQUIEME", "5e": "CINQUIEME",
+  "4eme": "QUATRIEME", "4ème": "QUATRIEME", "quatrieme": "QUATRIEME", "4e": "QUATRIEME",
+  "3eme": "TROISIEME", "3ème": "TROISIEME", "troisieme": "TROISIEME", "3e": "TROISIEME",
+  "seconde": "SECONDE", "premiere": "PREMIERE", "première": "PREMIERE", "terminale": "TERMINALE",
+  "etudes superieures": "SUPERIEUR", "études supérieures": "SUPERIEUR", "superieur": "SUPERIEUR",
+  "master 2 securite informatique": "SUPERIEUR", "master 2 sécurité informatique": "SUPERIEUR",
+  "scolarite terminee": "TERMINEE", "scolarité terminée": "TERMINEE", "terminee": "TERMINEE",
+  "ce2": "AVANT_CM1", "fini": "TERMINEE", "jss3": "TROISIEME",
+};
+
+export const CLASSE_CAT_MAP: Record<string, string> = {
+  "1ere annee": "ANNEE_1", "1ère année": "ANNEE_1", "1ere année": "ANNEE_1", "1": "ANNEE_1",
+  "annee 1": "ANNEE_1", "anee 1": "ANNEE_1",
+  "2eme annee": "ANNEE_2", "2ème année": "ANNEE_2", "2": "ANNEE_2", "annee 2": "ANNEE_2", "2e annee": "ANNEE_2",
+  "3eme annee": "ANNEE_3", "3ème année": "ANNEE_3", "3": "ANNEE_3", "annee 3": "ANNEE_3", "3eme": "ANNEE_3", "troisieme": "ANNEE_3",
+  "4eme annee": "ANNEE_4", "4ème année": "ANNEE_4", "4": "ANNEE_4", "annee 4": "ANNEE_4", "4eme": "ANNEE_4", "4e annee": "ANNEE_4",
+  "5eme annee": "ANNEE_5", "5ème année": "ANNEE_5", "5": "ANNEE_5", "annee 5": "ANNEE_5", "5eme": "ANNEE_5", "cinquieme annee": "ANNEE_5",
+  "termine": "TERMINE", "terminé": "TERMINE", "terminee": "TERMINE", "terminée": "TERMINE", "fini": "TERMINE",
+};
+
 const HEADER_MAP: Record<string, string> = {
   "nom": "nom",
   "nom de famille": "nom",

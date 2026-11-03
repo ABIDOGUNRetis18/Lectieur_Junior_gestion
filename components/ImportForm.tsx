@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
+import * as pdfjsLib from "pdfjs-dist";
 import { importerCsvAction, importerExcelAction } from "@/lib/actions/import";
 import type { ImportResult, ExcelRow } from "@/lib/actions/import";
-import { mapHeaders } from "@/lib/csv";
+
+// Configure pdf.js worker
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url
+  ).toString();
+}
+import { mapHeaders, normalizeHeader, CLASSE_ECOLE_MAP, CLASSE_CAT_MAP } from "@/lib/csv";
 
 export default function ImportForm({ fraternites }: { fraternites: { id: string; nom: string }[] }) {
   const [fraterniteId, setFraterniteId] = useState(fraternites[0]?.id ?? "");
@@ -20,7 +29,139 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
     if (!file) return;
     setFileName(file.name);
     setResult(null);
+    setCsvText("");
+    setExcelRows(null);
+    setHasFraterniteColumn(false);
     const lower = file.name.toLowerCase();
+    if (lower.endsWith(".pdf")) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      // Extract text items with positions, group by line
+      type Item = { str: string; x: number; y: number; w: number };
+      const linesMap: Record<number, Item[]> = {};
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        for (const it of content.items as { str: string; transform: number[]; width: number }[]) {
+          if (!it.str || !it.str.trim()) continue;
+          const y = Math.round(it.transform[5]);
+          const x = it.transform[4];
+          if (!linesMap[y]) linesMap[y] = [];
+          linesMap[y].push({ str: it.str, x, y, w: it.width || it.str.length * 5 });
+        }
+      }
+      const ys = Object.keys(linesMap).map(Number).sort((a, b) => b - a);
+      const lines: string[] = [];
+      const lineItems: Item[][] = [];
+      for (const y of ys) {
+        const items = linesMap[y].sort((a, b) => a.x - b.x);
+        lineItems.push(items);
+        // Build a textual line by joining items with single spaces (for header detection)
+        lines.push(items.map((it) => it.str).join(" ").trim());
+      }
+      // Find header line index
+      const headerLineIdx = lines.findIndex((l) => {
+        const n = l.toLowerCase();
+        return n.includes("nom") && (n.includes("prenom") || n.includes("naissance") || n.includes("date"));
+      });
+      if (headerLineIdx === -1) {
+        setExcelRows([]);
+        setCsvText("");
+        setHasFraterniteColumn(false);
+        setFileName(file.name);
+        setResult({ ok: false, error: "Aucun en-tête de tableau détecté dans le PDF.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] });
+        return;
+      }
+      // Header columns: filter out space-only items, use x positions as boundaries
+      const headerItems = lineItems[headerLineIdx].filter((it) => it.str.trim().length > 0);
+      const boundaries: number[] = [];
+      for (let i = 0; i < headerItems.length; i++) {
+        const cur = headerItems[i];
+        const next = headerItems[i + 1];
+        const curEnd = cur.x + cur.w;
+        if (next) {
+          boundaries.push((curEnd + next.x) / 2);
+        } else {
+          boundaries.push(Infinity);
+        }
+      }
+      function colIndex(x: number): number {
+        let idx = 0;
+        for (let i = 0; i < headerItems.length; i++) {
+          if (x + 20 >= headerItems[i].x) idx = i;
+          else break;
+        }
+        return idx;
+      }
+      const headerCols = headerItems.map((it) => it.str);
+      const { mapHeaders } = await import("@/lib/csv");
+      const hm = mapHeaders(headerCols);
+
+      const rows: ExcelRow[] = [];
+      for (let li = headerLineIdx + 1; li < lineItems.length; li++) {
+        const items = lineItems[li];
+        if (items.length === 0) continue;
+        const tokens = items.map((it) => it.str.trim()).filter((t) => t.length > 0);
+        if (tokens.length < 3) continue;
+        // Type-based classification (robust to column misalignment in PDFs)
+        let dateNaissance = "";
+        let classeEcole = "";
+        let classeCatechisme = "";
+        let telephoneParent = "";
+        let fraternite = "";
+        let statut = "";
+        const rest: string[] = [];
+        for (const tok of tokens) {
+          if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(tok) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(tok)) {
+            if (!dateNaissance) dateNaissance = tok;
+            else rest.push(tok);
+          } else if (/^\d{8,15}$/.test(tok.replace(/\s/g, ""))) {
+            if (!telephoneParent) telephoneParent = tok;
+            else rest.push(tok);
+          } else if (/^fraternit/i.test(tok)) {
+            // "Fraternité 1" may be split; accumulate following number
+            fraternite = tok;
+          } else if (/^actif$/i.test(tok) || /^inactif$/i.test(tok)) {
+            statut = tok;
+          } else {
+            const eco = CLASSE_ECOLE_MAP[normalizeHeader(tok)];
+            const cat = CLASSE_CAT_MAP[normalizeHeader(tok)];
+            if (eco && !classeEcole) classeEcole = tok;
+            else if (cat && !classeCatechisme) classeCatechisme = tok;
+            else rest.push(tok);
+          }
+        }
+        // Handle "Fraternité 1" split into two tokens: if a token is "Fraternité" and next is a number
+        // Re-scan rest for fraternite number
+        // (already handled partially; check rest for trailing number after fraternite)
+        if (fraternite && !/\d/.test(fraternite)) {
+          // find a number in rest that follows
+          const idx = rest.findIndex((t) => /^\d+$/.test(t));
+          if (idx !== -1) {
+            fraternite = fraternite + " " + rest.splice(idx, 1)[0];
+          }
+        }
+        // nom = first rest token, prenoms = rest joined
+        const nom = rest.length > 0 ? rest[0] : "";
+        const prenoms = rest.slice(1).join(" ");
+        if (!nom && !prenoms) continue;
+        rows.push({
+          fraternite: fraternite.trim(),
+          nom,
+          prenoms,
+          dateNaissance,
+          classeEcole: classeEcole, // raw text; server maps to enum
+          serie: "",
+          classeCatechisme: classeCatechisme, // raw text; server maps to enum
+          telephoneParent,
+          statut,
+        });
+      }
+      setExcelRows(rows);
+      setCsvText("");
+      setHasFraterniteColumn(false);
+      return;
+    }
     if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -99,7 +240,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
         <h2 className="font-headline-sm text-headline-sm text-primary">Import du registre</h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Fichiers acceptés : <strong>CSV</strong> ou <strong>Excel (.xlsx)</strong>. Colonnes
+          Fichiers acceptés : <strong>CSV</strong>, <strong>Excel (.xlsx)</strong> ou <strong>PDF</strong>. Colonnes
           attendues : <strong>Nom, Prénoms, Date de naissance, Classe à l&apos;école, Classe au
           catéchisme</strong>. Optionnelles : Fraternité, Série, Téléphone du parent, Statut.
         </p>
@@ -135,7 +276,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
           <label className="block font-label-md text-label-md text-on-surface">Fichier</label>
           <input
             type="file"
-            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept=".csv,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={onFile}
             className="w-full"
           />
