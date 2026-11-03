@@ -3,6 +3,8 @@ import { getGroupeCourant, getFraternites, getEnfantsActifs } from "@/lib/dal";
 
 import AppShell from "@/components/AppShell";
 import Link from "next/link";
+export const revalidate = 0;
+export const instant = false;
 
 export default async function TableauDeBordPage() {
   const session = await requireAuth();
