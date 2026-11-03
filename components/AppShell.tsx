@@ -12,6 +12,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const NAV = [
+  { href: "/enfants", label: "Enfants", icon: "groups" },
   { href: "/inscription", label: "Inscription", icon: "person_add" },
   { href: "/presence", label: "Présence", icon: "fact_check" },
   { href: "/cotisation", label: "Cotisation", icon: "payments" },
@@ -38,9 +39,9 @@ export default function AppShell({
           <div className="flex items-center gap-space-sm min-w-0 flex-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              alt="Logo Lecteurs Juniors"
-              className="h-8 w-auto object-contain flex-shrink-0"
-              src="https://lh3.googleusercontent.com/aida/AEtjO1WA-6Rn1mlMv8kN-Xj8JQUoOZXaFrZaM8EbxcC4bCW70Nnn_x0MTVwGIFgwMa56sxcbNKE_TbVs0N0-AinekZsINZRQSHJWasIrOq9_Va2lmnHAif0f0NAzryakQE0fW5uo3EVnx-p55UufH7Ugpz7ppXuCMuuzXOGTERXikgeNfkvzFOz1EKSuUE-3tUs2xy-OOWk32ynRFxlYPxQsybgmUrFi-ZDqNvOqO2V5JxOd"
+              alt="Logo Paroisse Saint-Michel Gbeto"
+              className="h-9 w-9 rounded-lg object-cover flex-shrink-0"
+              src="/logo-saint-michel-carre.webp"
             />
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-space-xs">
@@ -48,7 +49,7 @@ export default function AppShell({
                   Lecteurs Juniors
                 </span>
                 <span className="px-space-xs py-0.5 bg-secondary text-on-secondary rounded-full font-label-sm text-label-sm flex-shrink-0">
-                  Paroisse
+                  St-Michel Gbeto
                 </span>
               </div>
               <div className="flex items-center gap-space-xs mt-0.5">

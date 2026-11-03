@@ -81,7 +81,9 @@ export function normalizeHeader(h: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ");
+    .replace(/[’‘']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const HEADER_MAP: Record<string, string> = {
@@ -112,6 +114,10 @@ const HEADER_MAP: Record<string, string> = {
   "tel": "telephoneParent",
   "tel parent": "telephoneParent",
   "telephone du parent": "telephoneParent",
+  "fraternite": "fraternite",
+  "fraternité": "fraternite",
+  "statut": "statut",
+  "statut enfant": "statut",
 };
 
 export function mapHeaders(headers: string[]): Record<string, number> {

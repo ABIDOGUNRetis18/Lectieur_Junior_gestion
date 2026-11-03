@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { importerCsvAction } from "@/lib/actions/import";
-import type { ImportResult } from "@/lib/actions/import";
+import * as XLSX from "xlsx";
+import { importerCsvAction, importerExcelAction } from "@/lib/actions/import";
+import type { ImportResult, ExcelRow } from "@/lib/actions/import";
+import { mapHeaders } from "@/lib/csv";
 
-export default function ImportForm({
-  fraternites,
-}: {
-  fraternites: { id: string; nom: string }[];
-}) {
+export default function ImportForm({ fraternites }: { fraternites: { id: string; nom: string }[] }) {
   const [fraterniteId, setFraterniteId] = useState(fraternites[0]?.id ?? "");
   const [csvText, setCsvText] = useState("");
+  const [excelRows, setExcelRows] = useState<ExcelRow[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -19,31 +18,89 @@ export default function ImportForm({
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    const text = await file.text();
-    setCsvText(text);
+    setResult(null);
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const sheetName = wb.SheetNames.includes("Enfants") ? "Enfants" : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+      if (raw.length === 0) {
+        setExcelRows([]);
+        setCsvText("");
+        return;
+      }
+      const headers = Object.keys(raw[0]);
+      const headerMap = mapHeaders(headers);
+      const rows: ExcelRow[] = raw.map((r) => {
+        const get = (key: string) => {
+          const idx = headerMap[key];
+          if (idx === undefined) return "";
+          const h = headers[idx];
+          const v = r[h];
+          if (v instanceof Date) {
+            const d = v.getDate().toString().padStart(2, "0");
+            const m = (v.getMonth() + 1).toString().padStart(2, "0");
+            const y = v.getFullYear();
+            return `${d}/${m}/${y}`;
+          }
+          return v;
+        };
+        return {
+          fraternite: String(get("fraternite") ?? "").trim(),
+          nom: String(get("nom") ?? "").trim(),
+          prenoms: String(get("prenoms") ?? "").trim(),
+          dateNaissance: String(get("dateNaissance") ?? "").trim(),
+          classeEcole: String(get("classeEcole") ?? "").trim(),
+          serie: String(get("serie") ?? "").trim(),
+          classeCatechisme: String(get("classeCatechisme") ?? "").trim(),
+          telephoneParent: String(get("telephoneParent") ?? "").trim(),
+          statut: String(get("statut") ?? "").trim(),
+        };
+      });
+      setExcelRows(rows);
+      setCsvText("");
+    } else {
+      const text = await file.text();
+      setCsvText(text);
+      setExcelRows(null);
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!csvText) return;
+    if (!csvText && !excelRows) return;
     setLoading(true);
     setResult(null);
-    const res = await importerCsvAction(csvText, fraterniteId);
+    let res: ImportResult;
+    if (excelRows) {
+      res = await importerExcelAction(excelRows, fraterniteId);
+    } else {
+      res = await importerCsvAction(csvText, fraterniteId);
+    }
     setResult(res);
     setLoading(false);
   }
 
+  const hasData = !!csvText || (excelRows && excelRows.length > 0);
+
   return (
     <form className="px-margin py-space-md space-y-space-lg" onSubmit={onSubmit}>
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Import CSV du registre</h2>
+        <h2 className="font-headline-sm text-headline-sm text-primary">Import du registre</h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Colonnes attendues : <strong>Nom, Prénoms, Date de naissance, Classe à l&apos;école, Classe au catéchisme</strong>.
-          Optionnelles : Série, Téléphone du parent.
+          Fichiers acceptés : <strong>CSV</strong> ou <strong>Excel (.xlsx)</strong>. Colonnes
+          attendues : <strong>Nom, Prénoms, Date de naissance, Classe à l&apos;école, Classe au
+          catéchisme</strong>. Optionnelles : Fraternité, Série, Téléphone du parent, Statut.
+        </p>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Les classes sont converties automatiquement (ex. « 6ème » → SIXIEME, « Terminé » →
+          TERMINE). Les valeurs non reconnues sont signalées.
         </p>
 
         <div className="space-y-space-xs">
-          <label className="block font-label-md text-label-md text-on-surface">Fraternité cible</label>
+          <label className="block font-label-md text-label-md text-on-surface">Fraternité cible (par défaut)</label>
           <select
             className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
             value={fraterniteId}
@@ -56,19 +113,24 @@ export default function ImportForm({
         </div>
 
         <div className="space-y-space-xs">
-          <label className="block font-label-md text-label-md text-on-surface">Fichier CSV</label>
+          <label className="block font-label-md text-label-md text-on-surface">Fichier</label>
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={onFile}
             className="w-full"
           />
-          {fileName && <p className="font-body-sm text-on-surface-variant">Fichier : {fileName}</p>}
+          {fileName && (
+            <p className="font-body-sm text-on-surface-variant">
+              Fichier : {fileName}
+              {excelRows && ` — ${excelRows.length} ligne(s) détectée(s)`}
+            </p>
+          )}
         </div>
 
         <button
           type="submit"
-          disabled={loading || !csvText}
+          disabled={loading || !hasData}
           className="w-full h-[52px] min-h-[52px] bg-primary-container text-on-primary rounded-lg font-label-lg text-label-lg uppercase tracking-wide flex items-center justify-center space-x-space-sm active:bg-primary transition-all shadow-md disabled:opacity-60"
         >
           <span>{loading ? "Import en cours..." : "Importer"}</span>
@@ -85,7 +147,7 @@ export default function ImportForm({
               {result.erreurs.length > 0 && (
                 <div className="space-y-space-xs">
                   <p className="font-label-md text-label-md text-error">Erreurs :</p>
-                  <ul className="list-disc pl-5 space-y-1">
+                  <ul className="list-disc pl-5 space-y-1 max-h-40 overflow-y-auto">
                     {result.erreurs.map((e, i) => (
                       <li key={i} className="font-body-sm text-error">
                         Ligne {e.ligne} : {e.message}

@@ -10,9 +10,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Lecteurs Juniors — Paroisse",
+  title: "Lecteurs Juniors — Paroisse Saint-Michel Gbeto",
   description:
-    "Gestion des lecteurs juniors de la paroisse : présence, inscriptions, cotisations.",
+    "Gestion des lecteurs juniors de la paroisse Saint-Michel Gbeto (Cotonou) : présence, inscriptions, cotisations.",
+  icons: { icon: "/logo-saint-michel-carre.webp" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

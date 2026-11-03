@@ -36,9 +36,47 @@ export async function getEnfantsActifs(fraterniteId?: string) {
   });
 }
 
+export async function getEnfants(filters?: {
+  q?: string;
+  fraterniteId?: string;
+  statut?: "ACTIF" | "INACTIF" | "ALL";
+}) {
+  const groupeId = await requireGroup();
+  const statut = filters?.statut ?? "ALL";
+  return prisma.enfant.findMany({
+    where: {
+      groupeId,
+      ...(filters?.fraterniteId ? { fraterniteId: filters.fraterniteId } : {}),
+      ...(statut !== "ALL" ? { statut } : {}),
+      ...(filters?.q
+        ? {
+            OR: [
+              { nom: { contains: filters.q, mode: "insensitive" } },
+              { prenoms: { contains: filters.q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+    include: { fraternite: true },
+    orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
+  });
+}
+
 export async function getEnfantById(id: string) {
   const groupeId = await requireGroup();
   return prisma.enfant.findFirst({ where: { id, groupeId } });
+}
+
+export async function getEnfantWithDetails(id: string) {
+  const groupeId = await requireGroup();
+  return prisma.enfant.findFirst({
+    where: { id, groupeId },
+    include: {
+      fraternite: true,
+      presences: { orderBy: { date: "desc" } },
+      cotisations: { orderBy: { date: "desc" } },
+    },
+  });
 }
 
 // ---------- Utilisateurs ----------

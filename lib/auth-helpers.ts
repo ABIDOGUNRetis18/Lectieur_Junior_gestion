@@ -26,11 +26,11 @@ export async function requireAuth() {
   return session;
 }
 
-/** Lève une erreur si le rôle n'est pas autorisé. */
+/** Redirige vers le tableau de bord si le rôle n'est pas autorisé. */
 export async function requireRole(...roles: Role[]) {
   const session = await requireAuth();
   if (!roles.includes(session.user.role as Role)) {
-    throw new Error("Accès refusé : rôle insuffisant.");
+    redirect("/tableau-de-bord");
   }
   return session;
 }

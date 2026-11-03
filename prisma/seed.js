@@ -16,11 +16,11 @@ async function main() {
   premierDimanche.setUTCHours(0, 0, 0, 0);
 
   const groupe = await prisma.groupe.upsert({
-    where: { slug: "paroisse-saint-jean-baptiste" },
+    where: { slug: "paroisse-saint-michel-gbeto" },
     update: {},
     create: {
-      nom: "Paroisse Saint-Jean-Baptiste",
-      slug: "paroisse-saint-jean-baptiste",
+      nom: "Paroisse Saint-Michel Gbeto",
+      slug: "paroisse-saint-michel-gbeto",
       moisDebutAnnee: 10,
       moisSansReunion: [7, 8, 9],
       premierDimanche,
