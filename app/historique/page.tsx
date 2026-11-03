@@ -4,6 +4,8 @@ import { getGroupeCourant } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import AppShell from "@/components/AppShell";
 
+export const instant = false;
+
 export default async function HistoriquePage() {
   await requireRole("ADMIN");
   const groupe = await getGroupeCourant();
