@@ -230,7 +230,7 @@ export default function EnfantFiche({ enfant, fraternites }: Props) {
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-space-xs font-body-md text-body-md">
             <div><dt className="font-label-md text-on-surface-variant">Date de naissance</dt><dd>{enfant.dateNaissance}</dd></div>
             <div><dt className="font-label-md text-on-surface-variant">Classe à l'école</dt><dd>{CLASSE_LABEL[enfant.classeEcole] ?? enfant.classeEcole}</dd></div>
-            <div><dt className="font-label-md text-on-surface-variant">Série</dt><dd>{enfant.serie ?? "—"}</dd></div>
+            {CLASSES_AVEC_SERIE.includes(enfant.classeEcole) && (<div><dt className="font-label-md text-on-surface-variant">Série</dt><dd>{enfant.serie ?? "—"}</dd></div>)}
             <div><dt className="font-label-md text-on-surface-variant">Classe au catéchisme</dt><dd>{CAT_LABEL[enfant.classeCatechisme] ?? enfant.classeCatechisme}</dd></div>
             <div><dt className="font-label-md text-on-surface-variant">Téléphone parent</dt><dd>{enfant.telephoneParent ?? "—"}</dd></div>
             <div><dt className="font-label-md text-on-surface-variant">Inscrit le</dt><dd>{enfant.createdAt.slice(0, 10)}</dd></div>
