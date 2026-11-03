@@ -171,7 +171,7 @@ function ConnexionForm() {
         {/* Bouton retour accueil */}
         <button
           type="button"
-          onClick={() => router.push("/tableau-de-bord")}
+          onClick={() => router.push("/")}
           className="w-full h-[52px] min-h-[52px] border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center space-x-1 gap-space-sm"
         >
           <span className="material-symbols-outlined text-[18px]">home</span>
