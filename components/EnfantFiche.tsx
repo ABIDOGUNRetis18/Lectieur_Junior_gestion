@@ -182,7 +182,7 @@ export default function EnfantFiche({ enfant }: Props) {
                         : "text-error font-semibold"
                   }
                 >
-                  {p.etat === "PRESENT" ? "Présent" : p.etat === "PERMISSION" ? "Permission" : "Absent"}
+                  {p.etat === "PRESENT" ? "Présent" : p.etat === "PERMISSION" ? "Excusé" : "Absent"}
                 </span>
               </li>
             ))}

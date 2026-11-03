@@ -28,7 +28,7 @@ const PILL: Record<string, string> = {
   PERMISSION: "bg-tertiary-fixed text-on-tertiary-fixed",
   ABSENT: "bg-error-container text-on-error-container",
 };
-const PILL_TXT: Record<string, string> = { PRESENT: "P", PERMISSION: "Perm", ABSENT: "A" };
+const PILL_TXT: Record<string, string> = { PRESENT: "P", PERMISSION: "E", ABSENT: "A" };
 
 export default function ConsultationView({ data }: { data: Data }) {
   const router = useRouter();
