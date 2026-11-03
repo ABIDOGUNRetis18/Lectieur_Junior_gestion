@@ -9,8 +9,6 @@ datasource db {
 enum Role {
   ADMIN
   RESPONSABLE
-  TRESORIERE
-  SECRETAIRE
 }
 
 enum StatutEnfant {

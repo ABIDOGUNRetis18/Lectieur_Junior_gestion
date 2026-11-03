@@ -7,7 +7,7 @@ import AppShell from "@/components/AppShell";
 import CotisationForm from "@/components/CotisationForm";
 
 export default async function CotisationPage() {
-  const session = await requireRole("ADMIN", "TRESORIERE");
+  const session = await requireRole("ADMIN", "RESPONSABLE");
   const groupe = await getGroupeCourant();
   const fraternites = await getFraternites();
   const dimanches = getDimanchesValides(groupe!, 12).map((d) => d.toISOString().slice(0, 10));

@@ -8,7 +8,7 @@ import EnfantsList from "@/components/EnfantsList";
 type SP = { q?: string; fraternite?: string; statut?: string };
 
 export default async function EnfantsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireRole("ADMIN", "RESPONSABLE", "SECRETAIRE", "TRESORIERE");
+  await requireRole("ADMIN", "RESPONSABLE");
   const params = await searchParams;
   const fraternites = await getFraternites();
   const statut = (params.statut === "ACTIF" || params.statut === "INACTIF") ? params.statut : "ALL";
