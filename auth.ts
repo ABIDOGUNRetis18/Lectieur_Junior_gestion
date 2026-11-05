@@ -52,6 +52,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.groupeId = (user as { groupeId?: string }).groupeId;
         token.fraterniteId = (user as { fraterniteId?: string | null }).fraterniteId;
       }
+      // Rafraîchir les données utilisateur depuis la base (groupe/fraternité peuvent changer)
+      if (token.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email as string },
+          select: { id: true, groupeId: true, fraterniteId: true, role: true },
+        });
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.groupeId = dbUser.groupeId;
+          token.fraterniteId = dbUser.fraterniteId;
+          token.role = dbUser.role;
+        }
+      }
       return token;
     },
     async session({ session, token }) {

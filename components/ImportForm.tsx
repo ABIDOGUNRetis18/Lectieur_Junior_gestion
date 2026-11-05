@@ -4,6 +4,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import * as pdfjsLib from "pdfjs-dist";
 import { importerCsvAction, importerExcelAction } from "@/lib/actions/import";
+import { toastSuccess, toastError } from "@/lib/toast";
 import type { ImportResult, ExcelRow } from "@/lib/actions/import";
 
 // Configure pdf.js worker
@@ -13,7 +14,47 @@ if (typeof window !== "undefined") {
     import.meta.url
   ).toString();
 }
-import { mapHeaders, normalizeHeader, CLASSE_ECOLE_MAP, CLASSE_CAT_MAP } from "@/lib/csv";
+import { parseCsv, mapHeaders, normalizeHeader, CLASSE_ECOLE_MAP, CLASSE_CAT_MAP } from "@/lib/csv";
+
+// Génère et télécharge le modèle Excel conforme à la norme d'import
+function telechargerTemplate() {
+  const header = [
+    "Nom",
+    "Prénoms",
+    "Date de naissance",
+    "Classe à l'école",
+    "Série",
+    "Classe au catéchisme",
+    "Fraternité",
+    "Téléphone parent",
+    "Statut",
+  ];
+  const blank = () => Array(header.length).fill("");
+  const instructions: (string | number)[][] = [
+    ["MODÈLE D'IMPORT — Lecteurs Juniors"],
+    [],
+    ["Colonne", "Description / valeurs acceptées"],
+    ["Nom *", "Nom de famille (ex. KONE)"],
+    ["Prénoms *", "Prénoms de l'enfant (ex. Mireille)"],
+    ["Date de naissance *", "Format JJ/MM/AAAA (ex. 15/03/2015)"],
+    ["Classe à l'école *", "CE2, CM1, CM2, 3eme, 4eme, 5eme, 6eme, JSS3, 2nde, 1ère, Tle (Seconde, Première, Terminale), Études supérieures, Scolarité terminée"],
+    ["Série", "Uniquement pour 2nde / 1ère / Tle : A1, A2, B, C, D, E, F1, F2, F3, F4, G1, G2, G3"],
+    ["Classe au catéchisme *", "1ère à 5ème année, ou Terminée"],
+    ["Fraternité", "Fraternité 1 à Fraternité 5 — ou sélectionnez la fraternité cible à l'import"],
+    ["Téléphone parent", "Ex. +229 97 12 34 56 (optionnel)"],
+    ["Statut", "Actif (par défaut) ou Inactif (optionnel)"],
+    [],
+    ["* Colonnes obligatoires. Les classes non reconnues sont signalées à l'import."],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([header, blank(), blank(), blank()]);
+  ws["!cols"] = header.map(() => ({ wch: 22 }));
+  XLSX.utils.book_append_sheet(wb, ws, "Enfants");
+  const wsI = XLSX.utils.aoa_to_sheet(instructions);
+  wsI["!cols"] = [{ wch: 26 }, { wch: 90 }];
+  XLSX.utils.book_append_sheet(wb, wsI, "Instructions");
+  XLSX.writeFile(wb, "Template_Lecteurs_Juniors.xlsx");
+}
 
 export default function ImportForm({ fraternites }: { fraternites: { id: string; nom: string }[] }) {
   const [fraterniteId, setFraterniteId] = useState(fraternites[0]?.id ?? "");
@@ -27,6 +68,23 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setFileName("");
+      setCsvText("");
+      setExcelRows(null);
+      setHasFraterniteColumn(false);
+      setResult({
+        ok: false,
+        error: "Fichier trop volumineux : la taille maximale est de 5 Mo.",
+        total: 0,
+        ajoutes: 0,
+        doublons: 0,
+        erreurs: [],
+        details: [],
+      });
+      e.target.value = "";
+      return;
+    }
     setFileName(file.name);
     setResult(null);
     setCsvText("");
@@ -72,12 +130,7 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
         setResult({ ok: false, error: "Aucun en-tête de tableau détecté dans le PDF.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] });
         return;
       }
-      // Header columns: filter out space-only items
-      const headerItems = lineItems[headerLineIdx].filter((it) => it.str.trim().length > 0);
-      const headerCols = headerItems.map((it) => it.str);
-      const { mapHeaders } = await import("@/lib/csv");
-      const hm = mapHeaders(headerCols);
-
+      // Header line found above ; on passe aux lignes de données.
       const rows: ExcelRow[] = [];
       for (let li = headerLineIdx + 1; li < lineItems.length; li++) {
         const items = lineItems[li];
@@ -215,9 +268,8 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
       setCsvText(text);
       setExcelRows(null);
       // detect fraternite column in CSV header
-      const firstLine = text.split(/\\r?\\n/)[0];
-      // quick parse not full; reuse mapHeaders on split
-      const cols = firstLine.split(",");
+      const headerRows = parseCsv(text);
+      const cols = headerRows[0] ?? [];
       const hm = mapHeaders(cols);
       setHasFraterniteColumn(hm["fraternite"] !== undefined);
     }
@@ -236,6 +288,11 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
     }
     setResult(res);
     setLoading(false);
+    if (res.ok) {
+      toastSuccess(`Import : ${res.ajoutes} ajouté(s)`, `${res.doublons} doublon(s), ${res.erreurs.length} erreur(s) sur ${res.total} ligne(s).`);
+    } else {
+      toastError(res.error ?? "Erreur lors de l'import.");
+    }
   }
 
   const hasData = !!csvText || (excelRows && excelRows.length > 0);
@@ -253,6 +310,15 @@ export default function ImportForm({ fraternites }: { fraternites: { id: string;
           Les classes sont converties automatiquement (ex. « 6ème » → SIXIEME, « Terminé » →
           TERMINE). Les valeurs non reconnues sont signalées.
         </p>
+
+        <button
+          type="button"
+          onClick={telechargerTemplate}
+          className="inline-flex h-[44px] items-center gap-space-xs px-space-md rounded-lg border border-primary text-primary font-label-md hover:bg-primary-container hover:text-on-primary transition-colors w-full sm:w-auto justify-center"
+        >
+          <span className="material-symbols-outlined text-[18px]">download</span>
+          Télécharger le modèle Excel
+        </button>
 
         {!hasFraterniteColumn && fileName && (
           <div className="space-y-space-xs">

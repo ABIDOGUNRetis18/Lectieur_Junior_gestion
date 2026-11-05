@@ -1,4 +1,21 @@
+function detectDelimiter(text: string): "," | ";" {
+  const firstLine = text.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
+  let commas = 0;
+  let semicolons = 0;
+  let inQuotes = false;
+  for (const c of firstLine) {
+    if (c === '"') inQuotes = !inQuotes;
+    else if (!inQuotes) {
+      if (c === ",") commas++;
+      else if (c === ";") semicolons++;
+    }
+  }
+  return semicolons > commas ? ";" : ",";
+}
+
 export function parseCsv(text: string): string[][] {
+  text = text.replace(/^\uFEFF/, "");
+  const delimiter = detectDelimiter(text);
   const rows: string[][] = [];
   let current: string[] = [];
   let field = "";
@@ -41,7 +58,7 @@ export function parseCsv(text: string): string[][] {
         inQuotes = true;
         i++;
         continue;
-      } else if (c === ",") {
+      } else if (c === delimiter) {
         pushField();
         i++;
         continue;
@@ -77,6 +94,8 @@ export function parseCsv(text: string): string[][] {
 
 export function normalizeHeader(h: string): string {
   return h
+    .replace(/^\uFEFF/, "")
+    .replace(/\u00A0/g, " ")
     .trim()
     .toLowerCase()
     .normalize("NFD")

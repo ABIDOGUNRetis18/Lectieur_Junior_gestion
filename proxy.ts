@@ -15,7 +15,7 @@ export default auth((req) => {
   }
 
   if (isAuthed && pathname === "/connexion") {
-    return NextResponse.redirect(new URL("/presence", req.url));
+    return NextResponse.redirect(new URL("/tableau-de-bord", req.url));
   }
 
   return NextResponse.next();

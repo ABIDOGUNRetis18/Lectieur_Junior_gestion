@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAuth, requireRole, assertFraterniteInGroup } from "@/lib/auth-helpers";
+import { requireRole, assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import {

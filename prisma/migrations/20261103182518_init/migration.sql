@@ -1,8 +1,11 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'RESPONSABLE', 'TRESORIERE', 'SECRETAIRE');
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'RESPONSABLE');
 
 -- CreateEnum
 CREATE TYPE "StatutEnfant" AS ENUM ('ACTIF', 'INACTIF');
+
+-- CreateEnum
+CREATE TYPE "RoleEnfant" AS ENUM ('ENFANT', 'RESPONSABLE');
 
 -- CreateEnum
 CREATE TYPE "EtatPresence" AS ENUM ('PRESENT', 'PERMISSION', 'ABSENT');
@@ -55,7 +58,6 @@ CREATE TABLE "User" (
 -- CreateTable
 CREATE TABLE "Enfant" (
     "id" TEXT NOT NULL,
-    "numero" INTEGER NOT NULL,
     "nom" TEXT NOT NULL,
     "prenoms" TEXT NOT NULL,
     "dateNaissance" TIMESTAMP(3) NOT NULL,
@@ -65,6 +67,7 @@ CREATE TABLE "Enfant" (
     "classeCatechisme" "ClasseCatechisme" NOT NULL,
     "telephoneParent" TEXT,
     "statut" "StatutEnfant" NOT NULL DEFAULT 'ACTIF',
+    "role" "RoleEnfant" NOT NULL DEFAULT 'ENFANT',
     "fraterniteId" TEXT NOT NULL,
     "groupeId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -125,9 +128,6 @@ CREATE INDEX "Enfant_groupeId_fraterniteId_statut_idx" ON "Enfant"("groupeId", "
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Enfant_groupeId_cleDoublon_key" ON "Enfant"("groupeId", "cleDoublon");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Enfant_groupeId_numero_key" ON "Enfant"("groupeId", "numero");
 
 -- CreateIndex
 CREATE INDEX "Presence_groupeId_date_idx" ON "Presence"("groupeId", "date");

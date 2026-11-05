@@ -162,7 +162,7 @@ export default function ConsultationView({ data }: { data: Data }) {
         {data.enfants.length === 0 ? (
           <p className="font-body-sm text-on-surface-variant">Aucun enfant.</p>
         ) : (
-          <table className="min-w-full text-sm">
+          <table className="min-w-[720px] w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant">
                 <th className="text-left p-2 font-label-md sticky left-0 bg-surface-container-lowest z-10">Nom</th>
@@ -232,7 +232,7 @@ export default function ConsultationView({ data }: { data: Data }) {
       {/* Bilan annuel par enfant */}
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm overflow-x-auto">
         <h2 className="font-headline-sm text-headline-sm text-primary">Bilan annuel par enfant ({data.filters.annee})</h2>
-        <table className="min-w-full text-sm">
+        <table className="min-w-[560px] w-full text-sm">
           <thead>
             <tr className="border-b border-outline-variant">
               <th className="text-left p-2 font-label-md sticky left-0 bg-surface-container-lowest z-10">Nom</th>

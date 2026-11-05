@@ -3,7 +3,6 @@ export const instant = false;
 import { requireRole } from "@/lib/auth-helpers";
 import { getGroupeCourant } from "@/lib/dal";
 import { getConsultationData } from "@/lib/consultation";
-import { getFraternites } from "@/lib/dal";
 import AppShell from "@/components/AppShell";
 import ConsultationView from "@/components/ConsultationView";
 
@@ -25,7 +24,7 @@ export default async function ConsultationPage({
 
   return (
     <AppShell title="Consultation">
-      <ConsultationView data={data as any} />
+      <ConsultationView data={data} />
     </AppShell>
   );
 }

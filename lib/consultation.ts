@@ -36,17 +36,16 @@ export async function getConsultationData(groupeId: string, filters: Consultatio
   const enfantIds = enfants.map((e) => e.id);
 
   // Présences pour les dimanches sélectionnés
-  const dimancheDates = dimanches.map((d) => d.toISOString().slice(0, 10));
   const dateObjs = dimanches.map((d) => {
     const iso = d.toISOString().slice(0, 10);
     return new Date(iso + "T00:00:00Z");
   });
 
   const presences = await prisma.presence.findMany({
-    where: { groupeId, date: { in: dateObjs } },
+    where: { groupeId, enfantId: { in: enfantIds }, date: { in: dateObjs } },
   });
   const cotisations = await prisma.cotisation.findMany({
-    where: { groupeId, date: { in: dateObjs } },
+    where: { groupeId, enfantId: { in: enfantIds }, date: { in: dateObjs } },
   });
 
   // Map: enfantId -> dateISO -> etat/montant
@@ -70,10 +69,10 @@ export async function getConsultationData(groupeId: string, filters: Consultatio
   });
   const datesAnnee = dimanchesAnnee.map((d) => new Date(d.toISOString().slice(0, 10) + "T00:00:00Z"));
   const presencesAnnee = await prisma.presence.findMany({
-    where: { groupeId, date: { in: datesAnnee } },
+    where: { groupeId, enfantId: { in: enfantIds }, date: { in: datesAnnee } },
   });
   const cotisationsAnnee = await prisma.cotisation.findMany({
-    where: { groupeId, date: { in: datesAnnee } },
+    where: { groupeId, enfantId: { in: enfantIds }, date: { in: datesAnnee } },
   });
 
   const bilan: Record<string, { present: number; permission: number; absent: number; taux: number; cotisationTotal: number }> = {};

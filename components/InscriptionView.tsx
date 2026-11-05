@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import InscriptionForm from "@/components/InscriptionForm";
 import ImportForm from "@/components/ImportForm";
 
@@ -16,11 +14,10 @@ export default function InscriptionView({ fraternites }: Props) {
   // Si un seul fraternité visible et que l'utilisateur est RESPONSABLE,
   // on fige la fraternité (non modifiable)
   const seuleFrat = fraternites.length === 1;
-  const fraterniteId = seuleFrat ? fraternites[0].id : undefined;
 
   return (
     <div className="space-y-space-md">
-      <div className="flex gap-space-xs bg-surface-container-low rounded-xl p-1 mx-margin mt-space-md">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-space-xs bg-surface-container-low rounded-xl p-1 mx-margin mt-space-md">
         <button
           type="button"
           onClick={() => setMode("manuel")}

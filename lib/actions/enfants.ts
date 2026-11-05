@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { CLASSES_ECOLE, CLASSES_CATECHISME, SERIES } from "@/lib/schemas/inscription";
+import { normalizeNom, normalizePrenoms, makeCleDoublon } from "@/lib/normalization";
 
 export type EnfantActionResult =
   | { ok: true; message: string }
@@ -18,6 +18,8 @@ const classeCatechismeEnum = z.enum([
   "ANNEE_1", "ANNEE_2", "ANNEE_3", "ANNEE_4", "ANNEE_5", "TERMINE",
 ]);
 
+const roleEnfantEnum = z.enum(["ENFANT", "RESPONSABLE"]);
+
 const modifierSchema = z.object({
   enfantId: z.string().min(1),
   nom: z.string().min(1, "Nom requis").max(100),
@@ -25,9 +27,11 @@ const modifierSchema = z.object({
   dateNaissance: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide"),
   classeEcole: classeEcoleEnum,
   serie: z.string().optional().nullable(),
+  serieAutre: z.string().max(50).optional().nullable(),
   classeCatechisme: classeCatechismeEnum,
   telephoneParent: z.string().optional().nullable(),
   fraterniteId: z.string().min(1),
+  role: roleEnfantEnum,
 });
 
 export type ModifierEnfantResult =
@@ -70,17 +74,14 @@ export async function modifierEnfantAction(input: z.infer<typeof modifierSchema>
     return { ok: false, error: "Vous ne pouvez pas changer la fraternité." };
   }
 
-  // Normalize
-  const nom = data.nom.trim().toUpperCase();
-  const prenoms = data.prenoms
-    .trim()
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
+  // Normalisation identique à l'inscription pour que cleDoublon reste cohérente
+  // (accents, espaces et casse).
+  const nom = normalizeNom(data.nom);
+  const prenoms = normalizePrenoms(data.prenoms);
+  const dateNaissance = new Date(`${data.dateNaissance}T00:00:00.000Z`);
+  const newCle = makeCleDoublon(nom, prenoms, dateNaissance);
 
   // Anti-doublon check (if identity changed)
-  const dateNaissance = new Date(data.dateNaissance);
-  const newCle = `${nom.toLowerCase()}|${prenoms.toLowerCase()}|${dateNaissance.toISOString().slice(0, 10)}`;
   if (newCle !== enfant.cleDoublon) {
     const existing = await prisma.enfant.findUnique({
       where: { groupeId_cleDoublon: { groupeId: session.user.groupeId, cleDoublon: newCle } },
@@ -90,11 +91,12 @@ export async function modifierEnfantAction(input: z.infer<typeof modifierSchema>
     }
   }
 
-  // Série handling
+  // Série handling (même format que l'inscription : « Autre: précision »)
   let serie: string | null = null;
   if (["SECONDE", "PREMIERE", "TERMINALE"].includes(data.classeEcole)) {
     if (data.serie && data.serie !== "AUTRE") serie = data.serie;
-    else if (data.serie === "AUTRE") serie = data.serie; // keep as AUTRE if not specified
+    else if (data.serie === "AUTRE" && data.serieAutre?.trim())
+      serie = `Autre: ${data.serieAutre.trim()}`;
   }
 
   const changes: string[] = [];
@@ -104,6 +106,7 @@ export async function modifierEnfantAction(input: z.infer<typeof modifierSchema>
   if (enfant.classeCatechisme !== data.classeCatechisme) changes.push(`catéchisme: ${enfant.classeCatechisme} → ${data.classeCatechisme}`);
   if ((enfant.telephoneParent ?? "") !== (data.telephoneParent?.trim() ?? "")) changes.push("téléphone modifié");
   if (enfant.fraterniteId !== data.fraterniteId) changes.push("fraternité modifiée");
+  if (enfant.role !== data.role) changes.push(`rôle: ${enfant.role} → ${data.role}`);
 
   await prisma.enfant.update({
     where: { id: enfant.id },
@@ -112,18 +115,19 @@ export async function modifierEnfantAction(input: z.infer<typeof modifierSchema>
       prenoms,
       dateNaissance,
       cleDoublon: newCle,
-      classeEcole: data.classeEcole as any,
+      classeEcole: data.classeEcole,
       serie,
-      classeCatechisme: data.classeCatechisme as any,
+      classeCatechisme: data.classeCatechisme,
       telephoneParent: data.telephoneParent?.trim() || null,
       fraterniteId: data.fraterniteId,
+      role: data.role,
     },
   });
 
   await prisma.historique.create({
     data: {
       action: "ENFANT_MODIFIE",
-      details: `${nom} ${prenoms} (LJ-${String(enfant.numero).padStart(3, "0")}) modifié${changes.length ? " — " + changes.join(", ") : ""}`,
+      details: `${nom} ${prenoms} modifié${changes.length ? " — " + changes.join(", ") : ""}`,
       utilisateurId: session.user.id,
       groupeId: session.user.groupeId,
     },
@@ -158,13 +162,56 @@ export async function changerStatutEnfantAction(
   await prisma.historique.create({
     data: {
       action: nouveauStatut === "INACTIF" ? "ENFANT_DESACTIVE" : "ENFANT_REACTIVE",
-      details: `${enfant.nom} ${enfant.prenoms} (LJ-${String(enfant.numero).padStart(3, "0")}) → ${nouveauStatut}`,
+      details: `${enfant.nom} ${enfant.prenoms} → ${nouveauStatut}`,
       utilisateurId: session.user.id,
       groupeId: session.user.groupeId,
     },
   });
 
   return { ok: true, message: `${enfant.nom} ${enfant.prenoms} ${nouveauStatut === "INACTIF" ? "désactivé" : "réactivé"}.` };
+}
+
+export async function supprimerEnfantsAction(
+  enfantIds: string[]
+): Promise<{ ok: true; count: number; message: string } | { ok: false; error: string }> {
+  const session = await requireAuth();
+  if (!["ADMIN", "RESPONSABLE"].includes(session.user.role)) {
+    return { ok: false, error: "Accès refusé." };
+  }
+  if (!Array.isArray(enfantIds) || enfantIds.length === 0) {
+    return { ok: false, error: "Aucun enfant sélectionné." };
+  }
+
+  const enfants = await prisma.enfant.findMany({
+    where: { id: { in: enfantIds }, groupeId: session.user.groupeId },
+    include: { fraternite: true },
+  });
+
+  const allowed = enfants.filter(
+    (e) =>
+      session.user.role === "ADMIN" ||
+      (session.user.role === "RESPONSABLE" && session.user.fraterniteId === e.fraterniteId)
+  );
+
+  if (allowed.length === 0) {
+    return { ok: false, error: "Aucun enfant supprimable dans votre périmètre." };
+  }
+
+  const ids = allowed.map((e) => e.id);
+  const res = await prisma.enfant.deleteMany({ where: { id: { in: ids } } });
+
+  await prisma.historique.create({
+    data: {
+      action: "ENFANTS_SUPPRIMES",
+      details: `Suppression groupée de ${res.count} enfant(s) : ${allowed
+        .map((e) => `${e.nom} ${e.prenoms}`)
+        .join(", ")}`,
+      utilisateurId: session.user.id,
+      groupeId: session.user.groupeId,
+    },
+  });
+
+  return { ok: true, count: res.count, message: `${res.count} enfant(s) supprimé(s).` };
 }
 
 export async function supprimerEnfantAction(enfantId: string): Promise<EnfantActionResult> {
@@ -188,7 +235,7 @@ export async function supprimerEnfantAction(enfantId: string): Promise<EnfantAct
   await prisma.historique.create({
     data: {
       action: "ENFANT_SUPPRIME",
-      details: `Données supprimées : ${enfant.nom} ${enfant.prenoms} (LJ-${String(enfant.numero).padStart(3, "0")}) — fraternité ${enfant.fraternite.nom}`,
+      details: `Données supprimées : ${enfant.nom} ${enfant.prenoms} — fraternité ${enfant.fraternite.nom}`,
       utilisateurId: session.user.id,
       groupeId: session.user.groupeId,
     },
@@ -222,7 +269,6 @@ export async function exporterDonneesEnfantAction(enfantId: string): Promise<
 
   const data = {
     enfant: {
-      numero: enfant.numero,
       nom: enfant.nom,
       prenoms: enfant.prenoms,
       dateNaissance: enfant.dateNaissance.toISOString().slice(0, 10),
@@ -244,7 +290,7 @@ export async function exporterDonneesEnfantAction(enfantId: string): Promise<
   await prisma.historique.create({
     data: {
       action: "DONNEES_EXPORTEES",
-      details: `Export des données personnelles de ${enfant.nom} ${enfant.prenoms} (LJ-${String(enfant.numero).padStart(3, "0")})`,
+      details: `Export des données personnelles de ${enfant.nom} ${enfant.prenoms}`,
       utilisateurId: session.user.id,
       groupeId: session.user.groupeId,
     },

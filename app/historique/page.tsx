@@ -31,14 +31,14 @@ export default async function HistoriquePage() {
           </p>
         </section>
 
-        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm">
-          <table className="w-full text-left border-collapse">
+        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant font-label-sm text-label-sm border-b border-outline-variant/50">
-                <th className="pb-space-xs text-left w-24">Date</th>
-                <th className="pb-space-xs text-left">Utilisateur</th>
-                <th className="pb-space-xs text-left">Action</th>
-                <th className="pb-space-xs text-left">Détails</th>
+                <th className="pb-space-xs text-left w-24 whitespace-nowrap">Date</th>
+                <th className="pb-space-xs text-left whitespace-nowrap">Utilisateur</th>
+                <th className="pb-space-xs text-left whitespace-nowrap">Action</th>
+                <th className="pb-space-xs text-left whitespace-nowrap">Détails</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/40">

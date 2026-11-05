@@ -10,10 +10,14 @@ export default async function CotisationPage() {
   const session = await requireRole("ADMIN", "RESPONSABLE");
   const groupe = await getGroupeCourant();
   const fraternites = await getFraternites();
-  const dimanches = getDimanchesValides(groupe!, 12).map((d) => d.toISOString().slice(0, 10));
+  const dimanches = groupe ? getDimanchesValides(groupe, 12).map((d) => d.toISOString().slice(0, 10)) : [];
 
   const enfantsByFrat: Record<string, { id: string; nom: string; prenoms: string }[]> = {};
-  for (const f of fraternites) {
+  const visible =
+    session.user.role === "RESPONSABLE" && session.user.fraterniteId
+      ? fraternites.filter((f) => f.id === session.user.fraterniteId)
+      : fraternites;
+  for (const f of visible) {
     const enfants = await getEnfantsActifs(f.id);
     enfantsByFrat[f.id] = enfants.map((e) => ({
       id: e.id,
@@ -22,14 +26,13 @@ export default async function CotisationPage() {
     }));
   }
 
-  // RESPONSABLE sees all fraternities; ADMIN too
   return (
     <AppShell title="Cotisation">
       <CotisationForm
-        fraternites={fraternites}
+        fraternites={visible}
         dimanches={dimanches}
         enfantsByFrat={enfantsByFrat}
-        montant={groupe!.montantCotisation}
+        montant={groupe?.montantCotisation ?? 100}
       />
     </AppShell>
   );

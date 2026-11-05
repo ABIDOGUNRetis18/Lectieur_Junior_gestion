@@ -6,22 +6,21 @@ import { signIn } from "next-auth/react";
 
 import { Suspense } from "react";
 import Image from "next/image";
+import { toastError } from "@/lib/toast";
 
 function ConnexionForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/presence";
+  const callbackUrl = params.get("callbackUrl") ?? "/tableau-de-bord";
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setAlertVisible(false);
     const res = await signIn("credentials", {
       email: identifier,
       password,
@@ -33,7 +32,10 @@ function ConnexionForm() {
       router.push(callbackUrl);
       router.refresh();
     } else {
-      setAlertVisible(true);
+      toastError(
+        "Échec de l'authentification",
+        "Identifiants incorrects. Vérifiez avec le bureau paroissial ou réessayez."
+      );
     }
   }
 
@@ -63,31 +65,6 @@ function ConnexionForm() {
           </div>
         </header>
 
-        {/* Error State Alert Banner (Dismissible) */}
-        {alertVisible && (
-          <div className="bg-error-container text-on-error-container p-space-md rounded-xl flex items-start space-x-space-sm shadow-sm transition-all duration-200">
-            <span className="material-symbols-outlined text-error text-[22px] flex-shrink-0 mt-0.5">
-              error
-            </span>
-            <div className="flex-1">
-              <p className="font-label-md text-label-md font-semibold text-error">
-                Échec d&apos;authentification
-              </p>
-              <p className="font-body-sm text-body-sm mt-0.5 text-on-error-container leading-snug">
-                Identifiants incorrects. Vérifiez avec le bureau paroissial ou réessayez.
-              </p>
-            </div>
-            <button
-              aria-label="Fermer l'alerte"
-              className="min-w-[48px] min-h-[48px] -mr-2 -mt-2 flex items-center justify-center text-on-error-container active:scale-95"
-              type="button"
-              onClick={() => setAlertVisible(false)}
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-          </div>
-        )}
-
         {/* Login Form */}
         <form className="space-y-space-md pt-space-xs" onSubmit={onSubmit}>
           <div className="space-y-space-xs">
@@ -95,7 +72,7 @@ function ConnexionForm() {
               className="block font-label-md text-label-md font-semibold text-on-surface"
               htmlFor="user-identifier"
             >
-              Identifiant ou N° de téléphone
+              Identifiant (adresse e-mail)
             </label>
             <div className="relative rounded-xl border border-surface-container-highest/80 bg-surface-container-lowest shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
               <div className="absolute inset-y-0 left-0 pl-space-md flex items-center pointer-events-none text-outline">
@@ -107,9 +84,9 @@ function ConnexionForm() {
                 id="user-identifier"
                 inputMode="email"
                 name="identifier"
-                placeholder="ex. contact@paroisse.bj ou 97 00 00 00"
+                placeholder="ex. contact@paroisse.bj"
                 required
-                type="text"
+                type="email"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
               />
@@ -124,12 +101,6 @@ function ConnexionForm() {
               >
                 Mot de passe
               </label>
-              <a
-                className="font-label-md text-label-md text-primary font-medium hover:underline py-0.5"
-                href="#"
-              >
-                Code oublié ?
-              </a>
             </div>
             <div className="relative rounded-xl border border-surface-container-highest/80 bg-surface-container-lowest shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
               <div className="absolute inset-y-0 left-0 pl-space-md flex items-center pointer-events-none text-outline">
@@ -178,7 +149,7 @@ function ConnexionForm() {
           className="w-full h-[52px] min-h-[52px] border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center space-x-1 gap-space-sm"
         >
           <span className="material-symbols-outlined text-[18px]">home</span>
-          Retour à l'accueil
+          Retour à l&apos;accueil
         </button>
 
         {/* Support & Pastoral Office Footer Note */}

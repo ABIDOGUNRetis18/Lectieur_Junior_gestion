@@ -36,6 +36,13 @@ export async function enregistrerCotisationAction(input: {
     return { ok: false, error: "Fraternité introuvable." };
   }
 
+  if (
+    session.user.role === "RESPONSABLE" &&
+    session.user.fraterniteId !== data.fraterniteId
+  ) {
+    return { ok: false, error: "Vous ne pouvez enregistrer que votre fraternité." };
+  }
+
   const groupe = await getGroupeCourant();
   if (!groupe) return { ok: false, error: "Groupe introuvable." };
 
@@ -90,6 +97,12 @@ export async function enregistrerCotisationAction(input: {
 export async function getCotisationEtatsAction(date: string, fraterniteId: string) {
   const session = await requireAuth();
   const groupeId = session.user.groupeId;
+  if (
+    session.user.role === "RESPONSABLE" &&
+    session.user.fraterniteId !== fraterniteId
+  ) {
+    return [];
+  }
   const dateObj = new Date(date + "T00:00:00Z");
   const enfants = await prisma.enfant.findMany({
     where: { groupeId, fraterniteId },

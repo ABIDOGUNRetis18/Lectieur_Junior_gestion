@@ -1,15 +1,17 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 export type Role = "ADMIN" | "RESPONSABLE";
 
-export async function getSession() {
+/** Session dédupliquée pour tout le rendu (évite JWT + DB par appel). */
+export const getSession = cache(async () => {
   return await auth();
-}
+});
 
 export async function getCurrentUser() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) return null;
   return prisma.user.findUnique({
     where: { id: session.user.id },
@@ -19,7 +21,7 @@ export async function getCurrentUser() {
 
 /** Lève une erreur si non authentifié. */
 export async function requireAuth() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     redirect("/connexion");
   }

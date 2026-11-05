@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useState } from "react";
 
 export default function ConnexionCheck({ children }: { children: (isAuthenticated: boolean) => React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Update authentication state when session status changes

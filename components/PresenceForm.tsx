@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getPresenceEtatsAction, enregistrerPresenceAction } from "@/lib/actions/presence";
+import { ECOLE_LABELS } from "@/lib/schemas/inscription";
+import { toastSuccess, toastError } from "@/lib/toast";
 
 type Enfant = {
   id: string;
@@ -42,41 +44,31 @@ export default function PresenceForm({ fraternites, dimanches, enfantsByFrat }: 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; count?: number; error?: string } | null>(null);
 
-  const enfants = enfantsByFrat[fratId] ?? [];
+  const enfants = useMemo(() => enfantsByFrat[fratId] ?? [], [enfantsByFrat, fratId]);
 
   // Charger les états existants quand date/frat change
   useEffect(() => {
     if (!date || !fratId) return;
     let cancelled = false;
-    setLoadingEtats(true);
-    getPresenceEtatsAction(date, fratId)
-      .then((m) => {
+    async function load() {
+      setLoadingEtats(true);
+      try {
+        const m = await getPresenceEtatsAction(date, fratId);
         if (cancelled) return;
         const next: Record<string, "PRESENT" | "PERMISSION" | "ABSENT"> = {};
         for (const e of enfants) {
           next[e.id] = m[e.id] ?? "ABSENT";
         }
         setEtats(next);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingEtats(false);
-      });
+      }
+    }
+    void load();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, fratId]);
-
-  // Initialiser ABSENT pour les nouveaux enfants
-  useEffect(() => {
-    setEtats((prev) => {
-      const next = { ...prev };
-      for (const e of enfants) {
-        if (!next[e.id]) next[e.id] = "ABSENT";
-      }
-      return next;
-    });
-  }, [enfants]);
+  }, [date, fratId, enfants]);
 
   function setEtat(enfantId: string, etat: "PRESENT" | "PERMISSION" | "ABSENT") {
     setEtats((prev) => ({ ...prev, [enfantId]: etat }));
@@ -93,6 +85,8 @@ export default function PresenceForm({ fraternites, dimanches, enfantsByFrat }: 
     });
     setResult(res);
     setLoading(false);
+    if (res.ok) toastSuccess(`Présence enregistrée pour ${res.count} enfant(s)`);
+    else toastError(res.error ?? "Erreur lors de l'enregistrement.");
   }
 
   return (
@@ -162,7 +156,7 @@ export default function PresenceForm({ fraternites, dimanches, enfantsByFrat }: 
                     <p className="font-body-lg text-body-lg text-on-surface truncate">
                       {e.nom} {e.prenoms}
                     </p>
-                    <p className="font-body-sm text-body-sm text-on-surface-variant">{e.classeEcole}</p>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">{ECOLE_LABELS[e.classeEcole] ?? e.classeEcole}</p>
                   </div>
                   <div className="flex gap-1 rounded-lg bg-surface-container p-1">
                     {(["PRESENT", "PERMISSION", "ABSENT"] as const).map((st) => (

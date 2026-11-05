@@ -16,6 +16,11 @@ enum StatutEnfant {
   INACTIF
 }
 
+enum RoleEnfant {
+  ENFANT
+  RESPONSABLE
+}
+
 enum EtatPresence {
   PRESENT
   PERMISSION
@@ -96,7 +101,6 @@ model User {
 
 model Enfant {
   id                String            @id @default(cuid())
-  numero            Int // LJ-001 -> 1, jamais réutilisé
   nom               String // MAJUSCULES
   prenoms           String
   dateNaissance     DateTime
@@ -106,6 +110,7 @@ model Enfant {
   classeCatechisme  ClasseCatechisme
   telephoneParent   String?
   statut            StatutEnfant      @default(ACTIF)
+  role              RoleEnfant        @default(ENFANT)
   fraterniteId      String
   fraternite        Fraternite        @relation(fields: [fraterniteId], references: [id], onDelete: Cascade)
   groupeId          String
@@ -118,7 +123,6 @@ model Enfant {
   updatedAt         DateTime          @updatedAt
 
   @@unique([groupeId, cleDoublon])
-  @@unique([groupeId, numero])
   @@index([groupeId, fraterniteId, statut])
 }
 

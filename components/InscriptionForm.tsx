@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { inscrireEnfantsAction } from "@/lib/actions/inscription";
 import {
   CLASSES_ECOLE,
@@ -9,7 +8,9 @@ import {
   SERIES,
   CLASSES_AVEC_SERIE,
 } from "@/lib/schemas/inscription";
+import type { InscriptionInput, ChildInput } from "@/lib/schemas/inscription";
 import type { InscriptionResult } from "@/lib/actions/inscription";
+import { toastSuccess, toastError } from "@/lib/toast";
 
 type ChildRow = {
   nom: string;
@@ -40,7 +41,6 @@ export default function InscriptionForm({
   fraternites: { id: string; nom: string }[];
   soleUniqueFrat?: boolean;
 }) {
-  const router = useRouter();
   const [fraterniteId, setFraterniteId] = useState(
     soleUniqueFrat && fraternites.length === 1
       ? fraternites[0].id
@@ -63,32 +63,36 @@ export default function InscriptionForm({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!consentement) return;
     setLoading(true);
     setResult(null);
-    const payload = {
+    const payload: InscriptionInput = {
       fraterniteId,
-      consentement,
+      consentement: true,
       enfants: rows.map((r) => ({
         nom: r.nom,
         prenoms: r.prenoms,
         dateNaissance: r.dateNaissance,
-        classeEcole: r.classeEcole,
-        serie: r.serie || null,
+        classeEcole: r.classeEcole as ChildInput["classeEcole"],
+        serie: (r.serie || null) as ChildInput["serie"],
         serieAutre: r.serieAutre || null,
-        classeCatechisme: r.classeCatechisme,
+        classeCatechisme: r.classeCatechisme as ChildInput["classeCatechisme"],
         telephoneParent: r.telephoneParent || null,
       })),
     };
-    const res = await inscrireEnfantsAction(payload as any);
+    const res = await inscrireEnfantsAction(payload);
     setResult(res);
     setLoading(false);
     if (res.ok) {
-      // reset form on full success (no doublons)
+      const n = res.results.filter((r) => r.status === "ajoute").length;
+      toastSuccess(`${n} enfant(s) inscrit(s)`);
       const hasDoublon = res.results.some((r) => r.status === "doublon");
       if (!hasDoublon) {
         setRows([{ ...emptyRow }]);
         setConsentement(false);
       }
+    } else {
+      toastError(res.error ?? "Erreur lors de l'inscription.");
     }
   }
 
@@ -219,7 +223,7 @@ export default function InscriptionForm({
                 className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
                 value={row.telephoneParent}
                 onChange={(e) => updateRow(i, { telephoneParent: e.target.value })}
-                placeholder="+229 97 00 00 00"
+                placeholder="01 97 00 00 00"
               />
             </div>
           </section>
@@ -271,7 +275,7 @@ export default function InscriptionForm({
                   <li key={i} className="font-body-sm text-body-sm">
                     {r.status === "ajoute" ? (
                       <span className="text-secondary">
-                        ✅ {r.nom} {r.prenoms} ajouté (LJ-{String(r.numero).padStart(3, "0")})
+                        ✅ {r.nom} {r.prenoms} ajouté
                       </span>
                     ) : (
                       <span className="text-error">

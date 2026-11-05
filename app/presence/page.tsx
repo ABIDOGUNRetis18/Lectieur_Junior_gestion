@@ -10,7 +10,7 @@ export default async function PresencePage() {
   const session = await requireRole("ADMIN", "RESPONSABLE");
   const groupe = await getGroupeCourant();
   const fraternites = await getFraternites();
-  const dimanches = getDimanchesValides(groupe!, 12).map((d) => d.toISOString().slice(0, 10));
+  const dimanches = groupe ? getDimanchesValides(groupe, 12).map((d) => d.toISOString().slice(0, 10)) : [];
 
   const enfantsByFrat: Record<string, { id: string; nom: string; prenoms: string; classeEcole: string }[]> = {};
   for (const f of fraternites) {

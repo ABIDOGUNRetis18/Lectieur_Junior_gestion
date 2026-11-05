@@ -20,7 +20,7 @@ const PILIERS = [
     icon: "payments",
     titre: "Cotisations transparentes",
     texte:
-      "Suivi hebdomadaire de la cotisation par enfant et total de caisse instantané pour la trésorière.",
+      "Suivi hebdomadaire de la cotisation par enfant et total de caisse instantané pour le bureau paroissial.",
     note: "Reçus et totaux nets",
   },
   {
@@ -38,9 +38,8 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-surface-container-lowest/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="h-16 max-w-7xl mx-auto px-margin md:px-margin-desktop flex items-center justify-between">
-          <div className="flex items-center gap-space-sm">
+          <div className="flex items-center gap-space-sm min-w-0">
             <div className="w-9 h-9 rounded-lg overflow-hidden bg-primary-container flex items-center justify-center flex-shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <Image
                 alt="Logo Paroisse Saint-Michel Gbeto"
                 className="w-full h-full object-cover"
@@ -50,18 +49,18 @@ export default function Home() {
                 priority
               />
             </div>
-            <div className="flex flex-col">
-              <span className="font-headline-sm text-headline-sm text-primary-container leading-none">
+            <div className="flex flex-col min-w-0">
+              <span className="font-headline-sm text-headline-sm text-primary-container leading-none truncate">
                 Lecteurs Juniors
               </span>
-              <span className="font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase mt-space-xs">
+              <span className="font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase mt-space-xs truncate">
                 Paroisse Saint-Michel Gbeto
               </span>
             </div>
           </div>
           <Link
             href="/connexion"
-            className="inline-flex items-center justify-center gap-space-xs h-[44px] px-space-md rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg hover:bg-primary transition-colors shadow-sm"
+            className="shrink-0 inline-flex items-center justify-center gap-space-xs h-[44px] px-space-sm sm:px-space-md rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg hover:bg-primary transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[18px]">login</span>
             <span className="hidden sm:inline">Accéder à l&apos;espace</span>
@@ -261,7 +260,7 @@ export default function Home() {
       <footer className="w-full bg-surface-container-low text-on-surface-variant py-space-xl">
         <div className="max-w-7xl mx-auto px-margin md:px-margin-desktop">
           <div className="flex flex-col md:flex-row items-center justify-between gap-space-lg">
-            <div className="flex items-center gap-space-sm">
+            <div className="flex items-center gap-space-sm min-w-0">
               <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary-container flex items-center justify-center flex-shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -270,7 +269,7 @@ export default function Home() {
                   src="/logo-saint-michel-carre.webp"
                 />
               </div>
-              <span className="font-label-lg text-label-lg text-primary-container">
+              <span className="font-label-lg text-label-lg text-primary-container text-center md:text-left break-words">
                 Paroisse Saint-Michel Gbeto • Cotonou
               </span>
             </div>

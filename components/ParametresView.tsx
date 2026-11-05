@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateGroupeAction } from "@/lib/actions/parametres";
 import {
   creerCompteAction,
@@ -9,6 +10,8 @@ import {
   supprimerCompteAction,
 } from "@/lib/actions/comptes";
 import { MOIS_NOMS, ROLES } from "@/lib/schemas/parametres";
+import { confirmDialog } from "@/lib/confirm";
+import { toastSuccess, toastError } from "@/lib/toast";
 
 type Compte = {
   id: string;
@@ -41,6 +44,7 @@ function Err({ msgs }: { msgs?: string[] }) {
 }
 
 export default function ParametresView({ groupe, comptes, fraternites, currentUserId }: Props) {
+  const router = useRouter();
   // ---- Paramètres groupe ----
   const [nom, setNom] = useState(groupe.nom);
   const [montant, setMontant] = useState(String(groupe.montantCotisation));
@@ -64,6 +68,13 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
     });
   }
 
+  function notify(res: { ok: boolean; message?: string; error?: string } | null) {
+    if (!res) return;
+    setMsg({ ok: res.ok, text: res.ok ? res.message! : (res.error ?? "Erreur inconnue") });
+    if (res.ok) toastSuccess(res.message ?? "Enregistré.");
+    else toastError(res.error ?? "Erreur.");
+  }
+
   async function saveParams(e: React.FormEvent) {
     e.preventDefault();
     setSavingParams(true);
@@ -77,6 +88,12 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
     });
     setParamsResult(res);
     setSavingParams(false);
+    if (res.ok) {
+      toastSuccess(res.message ?? "Paramètres enregistrés.");
+      router.refresh();
+    } else {
+      toastError(res.error ?? "Erreur.");
+    }
   }
 
   // ---- Création de compte ----
@@ -107,9 +124,13 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
     setCreateResult(res);
     setCreating(false);
     if (res.ok) {
+      toastSuccess(res.message ?? "Compte créé.");
       setCNom("");
       setCEmail("");
       setCPwd("");
+      router.refresh();
+    } else {
+      toastError(res.error ?? "Erreur.");
     }
   }
 
@@ -127,8 +148,9 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
       role: role as never,
       fraterniteId: role === "RESPONSABLE" ? c.fraterniteId ?? fraternites[0]?.id ?? null : null,
     });
-    setMsg({ ok: res.ok, text: res.ok ? res.message! : res.error });
+    notify(res);
     setBusyId(null);
+    if (res.ok) router.refresh();
   }
 
   async function changeFrat(c: Compte, fraterniteId: string) {
@@ -139,8 +161,9 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
       role: c.role as never,
       fraterniteId: fraterniteId || null,
     });
-    setMsg({ ok: res.ok, text: res.ok ? res.message! : res.error });
+    notify(res);
     setBusyId(null);
+    if (res.ok) router.refresh();
   }
 
   async function resetPwd(e: React.FormEvent) {
@@ -149,21 +172,29 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
     setBusyId(pwdFor);
     setMsg(null);
     const res = await resetPasswordAction({ userId: pwdFor, password: newPwd });
-    setMsg({ ok: res.ok, text: res.ok ? res.message! : res.error });
+    notify(res);
     if (res.ok) {
       setPwdFor(null);
       setNewPwd("");
+      router.refresh();
     }
     setBusyId(null);
   }
 
   async function remove(c: Compte) {
-    if (!confirm(`Supprimer le compte de ${c.nom} ?`)) return;
+    const confirmed = await confirmDialog({
+      title: `Supprimer le compte de ${c.nom} ?`,
+      message: "L'utilisateur ne pourra plus se connecter. Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusyId(c.id);
     setMsg(null);
     const res = await supprimerCompteAction(c.id);
-    setMsg({ ok: res.ok, text: res.ok ? res.message! : res.error });
+    notify(res);
     setBusyId(null);
+    if (res.ok) router.refresh();
   }
 
   return (
@@ -425,9 +456,9 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
               </div>
 
               {pwdFor === c.id ? (
-                <form onSubmit={resetPwd} className="flex gap-space-xs">
+                <form onSubmit={resetPwd} className="flex flex-wrap gap-space-xs">
                   <input
-                    className="flex-1 h-[40px] rounded-lg border border-outline-variant px-space-xs font-body-sm"
+                    className="flex-1 min-w-[140px] h-[40px] rounded-lg border border-outline-variant px-space-xs font-body-sm"
                     type="password"
                     value={newPwd}
                     onChange={(e) => setNewPwd(e.target.value)}

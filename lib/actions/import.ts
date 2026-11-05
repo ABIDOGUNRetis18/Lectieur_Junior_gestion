@@ -5,6 +5,7 @@ import { assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { parseCsv, mapHeaders, normalizeHeader, CLASSE_ECOLE_MAP, CLASSE_CAT_MAP } from "@/lib/csv";
 import { normalizeNom, normalizePrenoms, makeCleDoublon } from "@/lib/normalization";
+import type { ClasseEcole, ClasseCatechisme } from "@prisma/client";
 
 const SERIES_VALID = new Set(["A1", "A2", "B", "C", "D", "E", "F1", "F2", "F3", "F4", "G1", "G2", "G3"]);
 
@@ -40,9 +41,9 @@ type ParsedRow = {
   nom: string;
   prenoms: string;
   dateNaissance: Date;
-  classeEcole: string;
+  classeEcole: ClasseEcole;
   serie: string | null;
-  classeCatechisme: string;
+  classeCatechisme: ClasseCatechisme;
   telephoneParent: string | null;
   statut: "ACTIF" | "INACTIF";
 };
@@ -51,12 +52,27 @@ async function importParsedRows(
   parsedRows: ParsedRow[],
   groupeId: string,
   userId: string,
-  fraternitesByName: Map<string, string>
+  fraternitesByName: Map<string, string>,
+  restrictFraterniteId?: string | null
 ): Promise<ImportResult> {
   const result: ImportResult = { ok: true, total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
 
-  const maxAgg = await prisma.enfant.aggregate({ where: { groupeId }, _max: { numero: true } });
-  let nextNumero = (maxAgg._max.numero ?? 0) + 1;
+  // Phase 1 : filtrage hors périmètre + détection de doublons (1 requête groupée)
+  const cles = parsedRows.map((r) => makeCleDoublon(r.nom, r.prenoms, r.dateNaissance));
+  const existing = cles.length
+    ? await prisma.enfant.findMany({
+        where: { groupeId, cleDoublon: { in: cles } },
+        include: { fraternite: true },
+      })
+    : [];
+  const byCle = new Map(existing.map((e) => [e.cleDoublon, e]));
+
+  const seen = new Set<string>();
+  const perRow: Array<
+    | { kind: "ok"; r: ParsedRow; fraterniteId: string; cle: string }
+    | { kind: "doublon"; r: ParsedRow; info: string }
+    | { kind: "erreur"; ligne: number; message: string; nom: string; prenoms: string }
+  > = [];
 
   for (let i = 0; i < parsedRows.length; i++) {
     const r = parsedRows[i];
@@ -66,61 +82,87 @@ async function importParsedRows(
     const fraterniteId = fraternitesByName.get(r.fraterniteNom.trim().toLowerCase());
     if (!fraterniteId) {
       result.erreurs.push({ ligne, message: `Fraternité inconnue : « ${r.fraterniteNom} ».` });
-      result.details.push({ nom: r.nom, prenoms: r.prenoms, status: "erreur", info: "Fraternité inconnue" });
+      perRow.push({ kind: "erreur", ligne, message: `Fraternité inconnue : « ${r.fraterniteNom} ».`, nom: r.nom, prenoms: r.prenoms });
+      continue;
+    }
+    if (restrictFraterniteId && fraterniteId !== restrictFraterniteId) {
+      perRow.push({ kind: "erreur", ligne, message: `Fraternité hors de votre périmètre : « ${r.fraterniteNom} ».`, nom: r.nom, prenoms: r.prenoms });
+      result.erreurs.push({ ligne, message: `Fraternité hors de votre périmètre : « ${r.fraterniteNom} ».` });
       continue;
     }
 
-    const cle = makeCleDoublon(r.nom, r.prenoms, r.dateNaissance);
-    const existing = await prisma.enfant.findUnique({
-      where: { groupeId_cleDoublon: { groupeId, cleDoublon: cle } },
-      include: { fraternite: true },
-    });
-    if (existing) {
+    const cle = cles[i];
+
+    if (seen.has(cle)) {
       result.doublons++;
-      result.details.push({
-        nom: r.nom,
-        prenoms: r.prenoms,
-        status: "doublon",
-        info: `Déjà inscrit dans ${existing.fraternite.nom} (${existing.statut})`,
-      });
-      await prisma.historique.create({
-        data: {
-          action: "DOUBLON_INSCRIPTION",
-          details: `${r.nom} ${r.prenoms} déjà inscrit (import) dans ${existing.fraternite.nom} (${existing.statut})`,
-          utilisateurId: userId,
-          groupeId,
-        },
+      perRow.push({ kind: "doublon", r, info: "Doublon dans le fichier (2 lignes identiques)." });
+      continue;
+    }
+    seen.add(cle);
+
+    const existingChild = byCle.get(cle);
+    if (existingChild) {
+      result.doublons++;
+      perRow.push({
+        kind: "doublon",
+        r,
+        info: `Déjà inscrit dans ${existingChild.fraternite.nom} (${existingChild.statut})`,
       });
       continue;
     }
 
-    const numero = nextNumero++;
-    await prisma.enfant.create({
-      data: {
-        numero,
+    perRow.push({ kind: "ok", r, fraterniteId, cle });
+  }
+
+  // Phase 2 : insertion groupée (2 requêtes au lieu de 2N)
+  const toCreate = perRow.filter((p) => p.kind === "ok") as Array<{ kind: "ok"; r: ParsedRow; fraterniteId: string; cle: string }>;
+  if (toCreate.length) {
+    await prisma.enfant.createMany({
+      data: toCreate.map(({ r, fraterniteId, cle }) => ({
         nom: r.nom,
         prenoms: r.prenoms,
         dateNaissance: r.dateNaissance,
         cleDoublon: cle,
-        classeEcole: r.classeEcole as any,
+        classeEcole: r.classeEcole,
         serie: r.serie,
-        classeCatechisme: r.classeCatechisme as any,
+        classeCatechisme: r.classeCatechisme,
         telephoneParent: r.telephoneParent,
         statut: r.statut,
         fraterniteId,
         groupeId,
-      },
+      })),
     });
-    result.ajoutes++;
-    result.details.push({ nom: r.nom, prenoms: r.prenoms, status: "ajoute", info: `LJ-${String(numero).padStart(3, "0")}` });
-    await prisma.historique.create({
-      data: {
+    await prisma.historique.createMany({
+      data: toCreate.map(({ r }) => ({
         action: "INSCRIPTION",
-        details: `${r.nom} ${r.prenoms} inscrit via import (LJ-${String(numero).padStart(3, "0")})`,
+        details: `${r.nom} ${r.prenoms} inscrit via import`,
         utilisateurId: userId,
         groupeId,
-      },
+      })),
     });
+  }
+
+  const duplicateInfos = perRow.filter((p) => p.kind === "doublon") as Array<{ kind: "doublon"; r: ParsedRow; info: string }>;
+  if (duplicateInfos.length) {
+    await prisma.historique.createMany({
+      data: duplicateInfos.map(({ r, info }) => ({
+        action: "DOUBLON_INSCRIPTION",
+        details: `${r.nom} ${r.prenoms} — ${info}`,
+        utilisateurId: userId,
+        groupeId,
+      })),
+    });
+  }
+
+  for (const p of perRow) {
+    if (p.kind === "ok") {
+      result.ajoutes++;
+      result.details.push({ nom: p.r.nom, prenoms: p.r.prenoms, status: "ajoute" });
+    } else if (p.kind === "doublon") {
+      result.details.push({ nom: p.r.nom, prenoms: p.r.prenoms, status: "doublon", info: p.info });
+    } else {
+      result.details.push({ nom: p.nom, prenoms: p.prenoms, status: "erreur", info: p.message });
+    }
   }
 
   return result;
@@ -227,9 +269,9 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
       nom,
       prenoms,
       dateNaissance,
-      classeEcole: classeNorm,
+      classeEcole: classeNorm as ClasseEcole,
       serie,
-      classeCatechisme: catNorm,
+      classeCatechisme: catNorm as ClasseCatechisme,
       telephoneParent: telRaw.trim() || null,
       statut,
     });
@@ -239,7 +281,13 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
     return { ok: false, error: "Aucune ligne valide.", total: parseErrors.length, ajoutes: 0, doublons: 0, erreurs: parseErrors, details: [] };
   }
 
-  const result = await importParsedRows(parsed, groupeId, session.user.id, byName);
+  const result = await importParsedRows(
+    parsed,
+    groupeId,
+    session.user.id,
+    byName,
+    session.user.role === "RESPONSABLE" ? session.user.fraterniteId : null
+  );
   // Merge parse errors into result
   result.total += parseErrors.length;
   result.erreurs = [...parseErrors.map((e) => ({ ligne: e.ligne, message: e.message })), ...result.erreurs];
@@ -336,9 +384,9 @@ export async function importerExcelAction(rows: ExcelRow[], fraterniteId: string
       nom,
       prenoms,
       dateNaissance,
-      classeEcole: classeNorm,
+      classeEcole: classeNorm as ClasseEcole,
       serie,
-      classeCatechisme: catNorm,
+      classeCatechisme: catNorm as ClasseCatechisme,
       telephoneParent: String(row.telephoneParent ?? "").trim() || null,
       statut,
     });
@@ -348,7 +396,13 @@ export async function importerExcelAction(rows: ExcelRow[], fraterniteId: string
     return { ok: false, error: "Aucune ligne valide.", total: parseErrors.length, ajoutes: 0, doublons: 0, erreurs: parseErrors, details: [] };
   }
 
-  const result = await importParsedRows(parsed, groupeId, session.user.id, byName);
+  const result = await importParsedRows(
+    parsed,
+    groupeId,
+    session.user.id,
+    byName,
+    session.user.role === "RESPONSABLE" ? session.user.fraterniteId : null
+  );
   result.total += parseErrors.length;
   result.erreurs = [...parseErrors, ...result.erreurs];
   return result;

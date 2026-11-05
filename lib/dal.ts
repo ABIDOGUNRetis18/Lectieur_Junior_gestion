@@ -3,7 +3,7 @@
  * Règle : TOUTE requête est filtrée par le groupeId de l'utilisateur connecté.
  * On centralise ce filtre ici plutôt que de le répéter dans chaque action.
  */
-import { requireAuth, requireRole, requireGroup } from "@/lib/auth-helpers";
+import { requireRole, requireGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 
 // ---------- Fraternités ----------
@@ -16,12 +16,43 @@ export async function getFraternites() {
   });
 }
 
+export async function getFraternitesAvecCount() {
+  const groupeId = await requireGroup();
+  const fraternites = await prisma.fraternite.findMany({
+    where: { groupeId },
+    orderBy: { nom: "asc" },
+    include: {
+      _count: {
+        select: { enfants: { where: { statut: "ACTIF" } } },
+      },
+    },
+  });
+  return fraternites.map((f) => ({
+    id: f.id,
+    nom: f.nom,
+    enfantsCount: f._count.enfants,
+  }));
+}
+
 export async function getFraterniteById(id: string) {
   const groupeId = await requireGroup();
   return prisma.fraternite.findFirst({ where: { id, groupeId } });
 }
 
 // ---------- Enfants (lecture) ----------
+
+/** Tous les enfants du groupe (actifs et inactifs) — pour les filtres du tableau. */
+export async function getEnfants(fraterniteId?: string) {
+  const groupeId = await requireGroup();
+  return prisma.enfant.findMany({
+    where: {
+      groupeId,
+      ...(fraterniteId ? { fraterniteId } : {}),
+    },
+    include: { fraternite: true },
+    orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
+  });
+}
 
 export async function getEnfantsActifs(fraterniteId?: string) {
   const groupeId = await requireGroup();
@@ -34,37 +65,6 @@ export async function getEnfantsActifs(fraterniteId?: string) {
     include: { fraternite: true },
     orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
   });
-}
-
-export async function getEnfants(filters?: {
-  q?: string;
-  fraterniteId?: string;
-  statut?: "ACTIF" | "INACTIF" | "ALL";
-}) {
-  const groupeId = await requireGroup();
-  const statut = filters?.statut ?? "ALL";
-  return prisma.enfant.findMany({
-    where: {
-      groupeId,
-      ...(filters?.fraterniteId ? { fraterniteId: filters.fraterniteId } : {}),
-      ...(statut !== "ALL" ? { statut } : {}),
-      ...(filters?.q
-        ? {
-            OR: [
-              { nom: { contains: filters.q, mode: "insensitive" } },
-              { prenoms: { contains: filters.q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    include: { fraternite: true },
-    orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
-  });
-}
-
-export async function getEnfantById(id: string) {
-  const groupeId = await requireGroup();
-  return prisma.enfant.findFirst({ where: { id, groupeId } });
 }
 
 export async function getEnfantWithDetails(id: string) {
@@ -89,6 +89,21 @@ export async function getUtilisateurs() {
     include: { fraternite: true },
     orderBy: { nom: "asc" },
   });
+}
+
+export async function getAdminsAndResponsables() {
+  const groupeId = await requireGroup();
+  const admins = await prisma.user.findMany({
+    where: { groupeId, role: "ADMIN" },
+    include: { fraternite: true },
+    orderBy: { nom: "asc" },
+  });
+  const responsablesEnfants = await prisma.enfant.findMany({
+    where: { groupeId, role: "RESPONSABLE", statut: "ACTIF" },
+    include: { fraternite: true },
+    orderBy: [{ fraternite: { nom: "asc" } }, { nom: "asc" }],
+  });
+  return { admins, responsablesEnfants };
 }
 
 // ---------- Groupe ----------

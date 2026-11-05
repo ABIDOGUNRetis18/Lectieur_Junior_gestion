@@ -8,9 +8,9 @@ export const CLASSES_ECOLE = [
   { value: "CINQUIEME", label: "5ème" },
   { value: "QUATRIEME", label: "4ème" },
   { value: "TROISIEME", label: "3ème" },
-  { value: "SECONDE", label: "Seconde" },
-  { value: "PREMIERE", label: "Première" },
-  { value: "TERMINALE", label: "Terminale" },
+  { value: "SECONDE", label: "2nde" },
+  { value: "PREMIERE", label: "1ère" },
+  { value: "TERMINALE", label: "Tle" },
   { value: "SUPERIEUR", label: "Études supérieures" },
   { value: "TERMINEE", label: "Scolarité terminée" },
 ] as const;
@@ -29,6 +29,25 @@ export const SERIES = [
 ] as const;
 
 export const CLASSES_AVEC_SERIE = ["SECONDE", "PREMIERE", "TERMINALE"];
+
+export const ECOLE_LABELS: Record<string, string> = Object.fromEntries(
+  CLASSES_ECOLE.map((c) => [c.value, c.label])
+);
+
+export const CATECHISME_LABELS: Record<string, string> = Object.fromEntries(
+  CLASSES_CATECHISME.map((c) => [c.value, c.label])
+);
+
+/** Libellé de la classe à l'école, avec la série à côté pour le second cycle (ex. « 2nde C »). */
+export function formatClasseEcole(classe: string, serie?: string | null): string {
+  const base = ECOLE_LABELS[classe] ?? classe;
+  if (!CLASSES_AVEC_SERIE.includes(classe)) return base;
+  const s = (serie ?? "").trim();
+  if (!s) return base;
+  // Les séries libres sont stockées sous « Autre: … » : on n'affiche que la précision
+  const detail = s.startsWith("Autre: ") ? s.slice(7) : s;
+  return `${base} ${detail}`;
+}
 
 const classeEcoleEnum = z.enum([
   "AVANT_CM1", "CM1", "CM2", "SIXIEME", "CINQUIEME", "QUATRIEME",

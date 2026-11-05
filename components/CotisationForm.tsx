@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { enregistrerCotisationAction, getCotisationEtatsAction } from "@/lib/actions/cotisation";
+import { toastSuccess, toastError } from "@/lib/toast";
 
 type Enfant = { id: string; nom: string; prenoms: string };
 
@@ -25,15 +26,16 @@ export default function CotisationForm({ fraternites, dimanches, enfantsByFrat, 
   useEffect(() => {
     if (!date || !fratId) return;
     let cancelled = false;
-    setLoadingEtats(true);
-    getCotisationEtatsAction(date, fratId)
-      .then((ids) => {
-        if (cancelled) return;
-        setPayes(new Set(ids));
-      })
-      .finally(() => {
+    async function load() {
+      setLoadingEtats(true);
+      try {
+        const ids = await getCotisationEtatsAction(date, fratId);
+        if (!cancelled) setPayes(new Set(ids));
+      } finally {
         if (!cancelled) setLoadingEtats(false);
-      });
+      }
+    }
+    void load();
     return () => {
       cancelled = true;
     };
@@ -65,6 +67,8 @@ export default function CotisationForm({ fraternites, dimanches, enfantsByFrat, 
     });
     setResult(res);
     setLoading(false);
+    if (res.ok) toastSuccess(`${res.count} enfant(s) payé(s) enregistré(s)`, `Total ${res.total} F enregistré.`);
+    else toastError(res.error ?? "Erreur lors de l'enregistrement.");
   }
 
   return (

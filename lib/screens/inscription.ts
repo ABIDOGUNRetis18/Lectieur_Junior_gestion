@@ -244,7 +244,7 @@ export const html = `
 <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-primary">
 <span class="material-symbols-outlined text-[20px]">call</span>
 </div>
-<input class="w-full h-12 pl-10 pr-space-md rounded-lg bg-surface-container-low text-on-surface font-body-lg text-body-lg outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary transition-all" id="parentPhone" placeholder="+229 97 00 00 00" type="tel" value="+229 97 12 34 56"/>
+<input class="w-full h-12 pl-10 pr-space-md rounded-lg bg-surface-container-low text-on-surface font-body-lg text-body-lg outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary transition-all" id="parentPhone" placeholder="01 97 00 00 00" type="tel" value="01 97 12 34 56"/>
 </div>
 <a class="w-12 h-12 rounded-lg bg-secondary text-on-secondary flex items-center justify-center flex-shrink-0 active:scale-95 shadow-sm transition-transform" href="tel:+22997123456" title="Appeler le parent">
 <span class="material-symbols-outlined text-[22px]">phone_in_talk</span>
@@ -295,7 +295,7 @@ export const html = `
 <span class="font-body-sm text-body-sm text-on-surface-variant truncate">3ème année caté</span>
 </div>
 <span class="font-body-sm text-body-sm text-primary flex items-center gap-1 mt-0.5">
-<span class="material-symbols-outlined text-[14px]">phone</span> +229 97 12 34 56
+<span class="material-symbols-outlined text-[14px]">phone</span> 01 97 12 34 56
           </span>
 </div>
 </div>
@@ -322,7 +322,7 @@ export const html = `
 <span class="font-body-sm text-body-sm text-on-surface-variant truncate">2ème année caté</span>
 </div>
 <span class="font-body-sm text-body-sm text-primary flex items-center gap-1 mt-0.5">
-<span class="material-symbols-outlined text-[14px]">phone</span> +229 96 45 88 12
+<span class="material-symbols-outlined text-[14px]">phone</span> 01 96 45 88 12
           </span>
 </div>
 </div>

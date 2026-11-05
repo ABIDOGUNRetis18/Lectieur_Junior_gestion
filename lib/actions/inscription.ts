@@ -1,6 +1,5 @@
 "use server";
 
-import { z } from "zod";
 import { requireAuth } from "@/lib/auth-helpers";
 import { assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +20,6 @@ export type InscriptionResult =
         nom: string;
         prenoms: string;
         status: "ajoute" | "doublon";
-        numero?: number;
         fraternite?: string;
         statut?: string;
       }>;
@@ -47,9 +45,8 @@ export async function inscrireEnfantsAction(
   const data = parsed.data;
 
   // Fraternité doit appartenir au groupe
-  let frat;
   try {
-    frat = await assertFraterniteInGroup(data.fraterniteId, session.user.groupeId);
+    await assertFraterniteInGroup(data.fraterniteId, session.user.groupeId);
   } catch {
     return { ok: false, error: "Fraternité introuvable pour ce groupe." };
   }
@@ -66,17 +63,11 @@ export async function inscrireEnfantsAction(
   }
 
   const groupeId = session.user.groupeId;
-  const maxAgg = await prisma.enfant.aggregate({
-    where: { groupeId },
-    _max: { numero: true },
-  });
-  let nextNumero = (maxAgg._max.numero ?? 0) + 1;
 
   type ResultItem = {
     nom: string;
     prenoms: string;
     status: "ajoute" | "doublon";
-    numero?: number;
     fraternite?: string;
     statut?: string;
   };
@@ -119,10 +110,8 @@ export async function inscrireEnfantsAction(
         serie = `Autre: ${e.serieAutre.trim()}`;
     }
 
-    const numero = nextNumero++;
     await prisma.enfant.create({
       data: {
-        numero,
         nom,
         prenoms,
         dateNaissance,
@@ -136,11 +125,11 @@ export async function inscrireEnfantsAction(
         groupeId,
       },
     });
-    results.push({ nom, prenoms, status: "ajoute", numero });
+    results.push({ nom, prenoms, status: "ajoute" });
     await prisma.historique.create({
       data: {
         action: "INSCRIPTION",
-        details: `${nom} ${prenoms} inscrit (LJ-${String(numero).padStart(3, "0")})`,
+        details: `${nom} ${prenoms} inscrit`,
         utilisateurId: session.user.id,
         groupeId,
       },

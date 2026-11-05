@@ -100,6 +100,12 @@ export async function enregistrerPresenceAction(input: {
 export async function getPresenceEtatsAction(date: string, fraterniteId: string) {
   const session = await requireAuth();
   const groupeId = session.user.groupeId;
+  if (
+    session.user.role === "RESPONSABLE" &&
+    session.user.fraterniteId !== fraterniteId
+  ) {
+    return {};
+  }
   const dateObj = new Date(date + "T00:00:00Z");
   const enfants = await prisma.enfant.findMany({
     where: { groupeId, fraterniteId },
