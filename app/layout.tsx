@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   icons: { icon: "/logo-saint-michel-carre.webp" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={`${inter.variable} h-full antialiased`}>
       <head>

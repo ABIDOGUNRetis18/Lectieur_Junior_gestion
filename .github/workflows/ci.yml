@@ -67,17 +67,8 @@ jobs:
           AUTH_URL: http://localhost:3000
           NEXTAUTH_URL: http://localhost:3000
 
-  sast:
-    name: SAST (CodeQL)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: javascript-typescript
-          queries: security-extended
-      - uses: github/codeql-action/analyze@v3
-
+  # SAST géré par le Default setup de GitHub (« CodeQL » workflow auto) — voir docs/CI-CD.md.
+  # Un job custom ici entrerait en conflit (SARIF « advanced vs default »).
   secrets:
     name: Secrets (Gitleaks)
     runs-on: ubuntu-latest
