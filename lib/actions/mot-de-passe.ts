@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import {
   generateOtpCode,
+  hashOtpCode,
+  verifyOtpCode,
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
@@ -14,6 +16,8 @@ import {
   verifyEmailDomain,
   type OtpPayload,
 } from "@/lib/otp";
+import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
+import { checkPasswordStrength } from "@/lib/password";
 
 export type MotDePasseResult =
   | { ok: true; message?: string; devCode?: string }
@@ -40,6 +44,12 @@ export async function demanderResetMotDePasseAction(emailRaw: string): Promise<M
   }
   const email = parsed.data.email.trim().toLowerCase();
 
+  // Rate limiting OTP reset : 3 demandes / 15 min par e-mail (item 1.2)
+  const otpLimit = checkRateLimit(`otp-reset:${email}`, 3, 15 * 60 * 1000);
+  if (!otpLimit.allowed) {
+    return { ok: false, error: rateLimitMessage(otpLimit.retryAfterSeconds), fieldErrors: { email: [rateLimitMessage(otpLimit.retryAfterSeconds)] } };
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     return {
@@ -62,7 +72,7 @@ export async function demanderResetMotDePasseAction(emailRaw: string): Promise<M
   const payload: OtpPayload = {
     purpose: "reset_password",
     email,
-    code,
+    code: hashOtpCode(code),
     expiresAt: Date.now() + 10 * 60 * 1000,
     data: { userId: user.id },
   };
@@ -87,7 +97,7 @@ export async function confirmerResetMotDePasseAction(input: {
     .object({
       newPassword: z
         .string()
-        .min(8, "8 caractères minimum")
+        .min(12, "12 caractères minimum")
         .max(128, "128 caractères maximum"),
       confirmPassword: z.string().min(1, "Confirmation requise"),
     })
@@ -100,8 +110,16 @@ export async function confirmerResetMotDePasseAction(input: {
   if (!payload || payload.purpose !== "reset_password") {
     return { ok: false, error: "Aucune demande de réinitialisation en cours ou code expiré." };
   }
-  if (payload.code !== input.code.trim()) {
-    return { ok: false, error: "Code incorrect." };
+  if (!verifyOtpCode(input.code, payload.code)) {
+    // Max 5 essais (item 1.2)
+    const attempts = (payload.attempts ?? 0) + 1;
+    if (attempts >= 5) {
+      await clearOtpCookie();
+      return { ok: false, error: "Trop de tentatives. Demande expirée, veuillez recommencer." };
+    }
+    payload.attempts = attempts;
+    await setOtpCookie(payload);
+    return { ok: false, error: `Code incorrect. (${attempts}/5 tentatives)` };
   }
 
   const parsed = schema.safeParse(input);
@@ -131,6 +149,12 @@ export async function confirmerResetMotDePasseAction(input: {
     };
   }
 
+  // Politique mot de passe (2.2)
+  const strengthReset = checkPasswordStrength(parsed.data.newPassword, { email: user.email, nom: user.nom });
+  if (!strengthReset.ok) {
+    return { ok: false, error: strengthReset.error!, fieldErrors: { newPassword: [strengthReset.error!] } };
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
@@ -157,7 +181,8 @@ export async function renvoyerOtpResetAction(): Promise<MotDePasseResult> {
     return { ok: false, error: "Aucune demande en cours." };
   }
   const code = generateOtpCode();
-  payload.code = code;
+  payload.code = hashOtpCode(code);
+  payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
   const { devCode } = await sendOtpEmail(payload.email, code);

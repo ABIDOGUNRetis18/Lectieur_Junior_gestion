@@ -52,7 +52,17 @@ export default function ConsultationView({ data }: { data: Data }) {
   async function exportExcel() {
     // Traçage best-effort : un échec ne doit pas bloquer l'export
     await tracerExportAction("EXCEL", data.filters.annee).catch(() => undefined);
+    const exportedAt = new Date().toLocaleString("fr-FR");
     const wb = XLSX.utils.book_new();
+    // Feuille d'info (filigrane / traçabilité)
+    const wsInfo = XLSX.utils.aoa_to_sheet([
+      ["Export Lecteurs Juniors"],
+      ["Consultation", data.filters.annee],
+      ["Exporté le", exportedAt],
+      ["Filtres", `Mois : ${data.filters.mois ?? "Toute l'année"} — Fraternité : ${data.filters.fraterniteId ?? "Toutes"}`],
+      ["Document confidentiel — ne pas diffuser hors de la paroisse."],
+    ]);
+    XLSX.utils.book_append_sheet(wb, wsInfo, "Info");
     // Feuille présence
     const header = ["Nom", "Prénoms", "Fraternité", ...data.dimanches.map((d) => d), "P", "Perm", "A"];
     const rows = data.enfants.map((e) => {
@@ -97,8 +107,11 @@ export default function ConsultationView({ data }: { data: Data }) {
   // --- Export PDF ---
   async function exportPDF() {
     await tracerExportAction("PDF", data.filters.annee).catch(() => undefined);
+    const exportedAt = new Date().toLocaleString("fr-FR");
     const doc = new jsPDF({ orientation: "landscape" });
     doc.text(`Consultation ${data.filters.annee}`, 14, 14);
+    doc.setFontSize(8);
+    doc.text(`Exporté le ${exportedAt} — Document confidentiel Lecteurs Juniors`, 14, 19);
     const head = [["Nom", "Prénoms", ...data.dimanches.map((d) => d.slice(5)), "P", "Perm", "A"]];
     const body = data.enfants.map((e) => {
       const b = data.bilan[e.id];
@@ -111,7 +124,20 @@ export default function ConsultationView({ data }: { data: Data }) {
         String(b?.absent ?? 0),
       ];
     });
-    autoTable(doc, { head, body, startY: 20, styles: { fontSize: 8 } });
+    autoTable(doc, {
+      head,
+      body,
+      startY: 24,
+      styles: { fontSize: 8 },
+      didParseCell: () => {},
+    });
+    // Pied de page sur chaque page (filigrane)
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7);
+      doc.text(`Lecteurs Juniors — Confidentiel — Exporté le ${exportedAt} — Page ${p}/${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    }
     doc.save(`consultation_${data.filters.annee}.pdf`);
   }
 

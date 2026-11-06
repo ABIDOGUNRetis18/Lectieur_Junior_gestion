@@ -10,8 +10,11 @@ import {
   type ProfilUpdateInput,
   type ChangePasswordInput,
 } from "@/lib/schemas/profil";
+import { checkPasswordStrength } from "@/lib/password";
 import {
   generateOtpCode,
+  hashOtpCode,
+  verifyOtpCode,
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
@@ -104,7 +107,7 @@ export async function demanderChangementEmailAction(
   const payload: OtpPayload = {
     purpose: "changement_email",
     email,
-    code,
+    code: hashOtpCode(code),
     expiresAt: Date.now() + 10 * 60 * 1000,
     data: { userId },
   };
@@ -129,7 +132,7 @@ export async function confirmerChangementEmailAction(code: string): Promise<Prof
   if (!payload || payload.purpose !== "changement_email") {
     return { ok: false, error: "Aucune demande en cours ou code expiré." };
   }
-  if (payload.code !== code.trim()) {
+  if (!verifyOtpCode(code, payload.code)) {
     return { ok: false, error: "Code incorrect." };
   }
 
@@ -194,12 +197,19 @@ export async function changerMotDePasseAction(
     };
   }
 
-  if (data.currentPassword === data.newPassword) {
+  // Force + réutilisation de l'actuel (comparaison bcrypt, pas string)
+  const samePw = await bcrypt.compare(data.newPassword, user.passwordHash);
+  if (samePw) {
     return {
       ok: false,
       error: "Le nouveau mot de passe doit être différent de l'actuel.",
       fieldErrors: { newPassword: ["Choisissez un mot de passe différent."] },
     };
+  }
+
+  const strengthChange = checkPasswordStrength(data.newPassword, { email: user.email, nom: user.nom });
+  if (!strengthChange.ok) {
+    return { ok: false, error: strengthChange.error!, fieldErrors: { newPassword: [strengthChange.error!] } };
   }
 
   await prisma.user.update({
@@ -226,7 +236,8 @@ export async function renvoyerOtpEmailAction(): Promise<ProfilResult> {
     return { ok: false, error: "Aucune demande en cours." };
   }
   const code = generateOtpCode();
-  payload.code = code;
+  payload.code = hashOtpCode(code);
+  payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
   const { devCode } = await sendOtpEmail(payload.email, code);

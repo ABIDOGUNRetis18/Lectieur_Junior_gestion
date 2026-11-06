@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Injection / XSS guard (item 1.5)
+        run: |
+          set -e
+          if grep -R "queryRaw\|executeRaw" --include="*.ts" --include="*.tsx" app lib components auth.ts proxy.ts 2>/dev/null; then echo "queryRaw forbidden"; exit 1; fi
+          if grep -R "dangerouslySetInnerHTML" --include="*.ts" --include="*.tsx" app lib components 2>/dev/null; then echo "dangerouslySetInnerHTML forbidden"; exit 1; fi
+          echo "no raw SQL / no dangerouslySetInnerHTML"
+
+      - name: Guard force-dynamic (P2)
+        run: |
+          set -e
+          if grep -R 'export const dynamic = "force-dynamic"' --include="*.ts" --include="*.tsx" app 2>/dev/null; then
+            echo "force-dynamic forbidden — simplifier la route (connection() / instant=false) ou justifier dans la PR"
+            exit 1
+          fi
+          echo "no force-dynamic"
+
+      - name: Audit (fail on critical)
+        run: npm audit --audit-level=critical
+
+      - name: Audit (warn on high)
+        continue-on-error: true
+        run: npm audit --audit-level=high || true
+
+      - name: Build
+        run: npx next build
+        env:
+          DATABASE_URL: postgresql://user:password@host-pooler.region.aws.neon.tech/dbname?sslmode=require
+          DIRECT_URL: postgresql://user:password@host.region.aws.neon.tech/dbname?sslmode=require
+          AUTH_SECRET: ci-test-secret-not-used-in-production
+          AUTH_URL: http://localhost:3000
+          NEXTAUTH_URL: http://localhost:3000
+
+  sast:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+
+  secrets:
+    name: Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

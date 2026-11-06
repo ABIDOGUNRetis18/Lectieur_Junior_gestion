@@ -1,0 +1,14 @@
+# CODEOWNERS — Lecteurs Juniors
+# Les chemins critiques requièrent une review d'un owner avant merge.
+
+/auth.ts @ABIDOGUNRetis18
+/lib/otp.ts @ABIDOGUNRetis18
+/lib/actions/mot-de-passe.ts @ABIDOGUNRetis18
+/lib/actions/rejoindre.ts @ABIDOGUNRetis18
+/lib/actions/profil.ts @ABIDOGUNRetis18
+/proxy.ts @ABIDOGUNRetis18
+/lib/session-revoke.ts @ABIDOGUNRetis18
+/lib/rate-limit.ts @ABIDOGUNRetis18
+/lib/password.ts @ABIDOGUNRetis18
+/next.config.ts @ABIDOGUNRetis18
+/.github/ @ABIDOGUNRetis18

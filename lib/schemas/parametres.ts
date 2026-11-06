@@ -58,7 +58,7 @@ export const compteCreateSchema = z
       .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "E-mail invalide"),
     password: z
       .string()
-      .min(8, "8 caractères minimum")
+      .min(12, "12 caractères minimum")
       .max(128, "128 caractères maximum"),
     role: z.enum(["ADMIN", "RESPONSABLE"]),
     fraterniteId: z.string().optional().nullable(),
@@ -89,7 +89,7 @@ export const resetPasswordSchema = z.object({
   userId: z.string().min(1),
   password: z
     .string()
-    .min(8, "8 caractères minimum")
+    .min(12, "12 caractères minimum")
     .max(128, "128 caractères maximum"),
 });
 

@@ -443,7 +443,7 @@ export default function ProfilForm({ user }: { user: User }) {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={12}
                 autoComplete="new-password"
               />
               <Err msgs={pwdResult?.fieldErrors?.newPassword} />

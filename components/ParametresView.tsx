@@ -335,7 +335,7 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
             <Err msgs={createResult?.fieldErrors?.email} />
           </div>
           <div className="space-y-space-xs">
-            <label className="block font-label-md text-label-md text-on-surface">Mot de passe (8 car. min)</label>
+            <label className="block font-label-md text-label-md text-on-surface">Mot de passe (12 car. min)</label>
             <input
               className={FIELD}
               type="password"
@@ -462,7 +462,7 @@ export default function ParametresView({ groupe, comptes, fraternites, currentUs
                     type="password"
                     value={newPwd}
                     onChange={(e) => setNewPwd(e.target.value)}
-                    placeholder="Nouveau mot de passe (8 car. min)"
+                    placeholder="Nouveau mot de passe (12 car. min)"
                     autoFocus
                   />
                   <button

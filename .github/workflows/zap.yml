@@ -1,0 +1,41 @@
+name: DAST (ZAP baseline)
+
+# Scan hebdomadaire (lundi 03:00 UTC) + lancement manuel
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx next build
+        env:
+          DATABASE_URL: postgresql://user:password@host-pooler.region.aws.neon.tech/dbname?sslmode=require
+          DIRECT_URL: postgresql://user:password@host.region.aws.neon.tech/dbname?sslmode=require
+          AUTH_SECRET: ci-test-secret-not-used-in-production
+          AUTH_URL: http://localhost:3000
+          NEXTAUTH_URL: http://localhost:3000
+      - run: npx next start -p 3000 > /tmp/zap-start.log 2>&1 &
+        env:
+          DATABASE_URL: postgresql://user:password@host-pooler.region.aws.neon.tech/dbname?sslmode=require
+          DIRECT_URL: postgresql://user:password@host.region.aws.neon.tech/dbname?sslmode=require
+          AUTH_SECRET: ci-test-secret-not-used-in-production
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/connexion >/dev/null; then echo "server up"; break; fi
+            sleep 2
+          done
+      - uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: "http://localhost:3000"
+          fail_action: true
+          allow_issue_writing: false

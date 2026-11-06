@@ -5,7 +5,8 @@ import dns from "dns";
 import net from "net";
 import tls from "tls";
 import { promisify } from "util";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { logger } from "@/lib/logger";
 
 const COOKIE_NAME = "otp_pending";
 const TTL_SECONDS = 10 * 60; // 10 minutes
@@ -17,9 +18,22 @@ function getKey(): Buffer {
 
 const resolveMx = promisify(dns.resolveMx);
 
-/** Génère un code OTP à 6 chiffres. */
+/** Génère un code OTP à 6 chiffres (en clair, jamais stocké). */
 export function generateOtpCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+/** Hash SHA-256 d'un code OTP (stocké dans le cookie chiffré, jamais le clair). */
+export function hashOtpCode(code: string): string {
+  return crypto.createHash("sha256").update(code, "utf8").digest("hex");
+}
+
+/** Vérification en temps constant d'un code OTP contre son hash. */
+export function verifyOtpCode(code: string, hash: string): boolean {
+  const a = Buffer.from(hashOtpCode(code.trim()), "utf8");
+  const b = Buffer.from(hash, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 /** Vérifie que le domaine de l'e-mail possède des enregistrements MX (peut recevoir des e-mails). */
@@ -66,6 +80,7 @@ export type OtpPayload = {
   email: string;
   code: string;
   expiresAt: number;
+  attempts?: number;
   data: Record<string, unknown>;
 };
 
@@ -382,12 +397,20 @@ export async function sendOtpEmail(
       await sendSmtpEmail(email, "Code de vérification — Lecteurs Juniors", code);
       return {};
     } catch (err) {
-      console.error("SMTP error:", err);
+      const h = await headers().catch(() => null);
+      logger.error("smtp_send_failed", {
+        emailDomain: email.split("@")[1] ?? null,
+        requestId: h?.get("x-request-id") ?? undefined,
+        error: err instanceof Error ? err.message : "unknown",
+      });
       throw new Error("Échec de l'envoi de l'e-mail de vérification.");
     }
   }
 
   // Fallback dev : log dans la console + renvoyer le code au client
-  console.log(`[OTP DEV] ${email} → ${code}`);
+  // Ne jamais logger le code en production (ici uniquement si SMTP absent + dev)
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[OTP DEV] ${email} → ${code}`);
+  }
   return { devCode: code };
 }

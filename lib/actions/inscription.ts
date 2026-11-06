@@ -129,7 +129,7 @@ export async function inscrireEnfantsAction(
     await prisma.historique.create({
       data: {
         action: "INSCRIPTION",
-        details: `${nom} ${prenoms} inscrit`,
+        details: `${nom} ${prenoms} inscrit (consentement parental donné)`,
         utilisateurId: session.user.id,
         groupeId,
       },

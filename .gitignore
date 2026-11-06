@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# exports d'audit (2.3) — génération locale, jamais commités
+/exports/
+
 # vercel
 .vercel
 

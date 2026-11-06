@@ -4,6 +4,10 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getRevokedEpoch } from "@/lib/session-revoke";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+// Hash factice pour délai constant si l'utilisateur n'existe pas (item 1.3)
+const DUMMY_HASH = "$2b$12$invalidhashinvalidhashinvalidhashinvalidha";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -25,20 +29,55 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+
+        // Rate limiting connexion : 5 échecs / 15 min par e-mail (item 1.2)
+        const limit = checkRateLimit(`login:${email.toLowerCase()}`, 5, 15 * 60 * 1000);
+        if (!limit.allowed) return null;
+
         const user = await prisma.user.findUnique({
           where: { email },
           include: { fraternite: true },
         });
-        if (!user) return null;
-
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) {
+        // Délai constant : on compare toujours, même si l'utilisateur n'existe pas
+        const hashToCheck = user?.passwordHash ?? DUMMY_HASH;
+        const ok = await bcrypt.compare(password, hashToCheck);
+        if (!user || !ok) {
           // Tentative échouée sur un compte existant : à tracer
+          if (user) {
+            await prisma.historique
+              .create({
+                data: {
+                  action: "CONNEXION_ECHOUEE",
+                  details: `Tentative de connexion échouée (${user.email})`,
+                  utilisateurId: user.id,
+                  groupeId: user.groupeId,
+                },
+              })
+              .catch(() => undefined);
+          }
+          return null;
+        }
+
+        // Comptes dormants : bloqué après 90 j sans activité (2.2)
+        // Dernière activité = max(updatedAt, dernière CONNEXION). Un reset password relance le compteur (updatedAt).
+        const DORMANT_MS = 90 * 24 * 60 * 60 * 1000;
+        const lastConnexion = await prisma.historique
+          .findFirst({
+            where: { utilisateurId: user.id, action: "CONNEXION" },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+          })
+          .catch(() => null);
+        const lastActivity = Math.max(
+          user.updatedAt.getTime(),
+          lastConnexion?.createdAt?.getTime() ?? 0
+        );
+        if (Date.now() - lastActivity > DORMANT_MS) {
           await prisma.historique
             .create({
               data: {
                 action: "CONNEXION_ECHOUEE",
-                details: `Tentative de connexion échouée (${user.email})`,
+                details: `Compte dormant (> 90 j sans activité) — ${user.email}`,
                 utilisateurId: user.id,
                 groupeId: user.groupeId,
               },
@@ -73,7 +112,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
       // Routes publiques
-      if (pathname === "/" || pathname.startsWith("/connexion") || pathname.startsWith("/api/auth") || pathname.startsWith("/rejoindre") || pathname.startsWith("/mot-de-passe-oublie")) {
+      if (pathname === "/" || pathname.startsWith("/connexion") || pathname.startsWith("/api/auth") || pathname.startsWith("/api/csp-report") || pathname.startsWith("/rejoindre") || pathname.startsWith("/mot-de-passe-oublie") || pathname.startsWith("/confidentialite")) {
         return true;
       }
       return !!auth;

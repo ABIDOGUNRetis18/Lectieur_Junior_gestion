@@ -191,7 +191,7 @@ export default function RejoindreForm({ fraternites }: { fraternites: Frat[] }) 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={12}
               autoComplete="new-password"
             />
             <Err msgs={formResult?.fieldErrors?.password} />

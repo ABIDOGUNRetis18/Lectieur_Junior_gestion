@@ -179,7 +179,7 @@ export default function MotDePasseOublieForm() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={12}
               autoComplete="new-password"
             />
             <Err msgs={otpResult?.fieldErrors?.newPassword} />

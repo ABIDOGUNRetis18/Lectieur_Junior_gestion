@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import {
   generateOtpCode,
+  hashOtpCode,
+  verifyOtpCode,
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
@@ -14,6 +16,8 @@ import {
   verifyEmailDomain,
   type OtpPayload,
 } from "@/lib/otp";
+import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
+import { checkPasswordStrength } from "@/lib/password";
 
 const inscriptionSchema = z.object({
   nom: z.string().min(2, "Nom requis (2 caractères minimum)").max(120),
@@ -26,7 +30,7 @@ const inscriptionSchema = z.object({
   fraterniteId: z.string().min(1, "Choisissez une fraternité"),
   password: z
     .string()
-    .min(8, "8 caractères minimum")
+    .min(12, "12 caractères minimum")
     .max(128, "128 caractères maximum"),
   confirmPassword: z.string().min(1, "Confirmation requise"),
 }).refine((d) => d.password === d.confirmPassword, {
@@ -53,6 +57,18 @@ export async function demanderInscriptionAction(
   }
   const data = parsed.data;
   const email = data.email.trim().toLowerCase();
+
+  // Rate limiting OTP inscription : 3 demandes / 15 min par e-mail (item 1.2)
+  const otpLimit = checkRateLimit(`otp-inscription:${email}`, 3, 15 * 60 * 1000);
+  if (!otpLimit.allowed) {
+    return { ok: false, error: rateLimitMessage(otpLimit.retryAfterSeconds) };
+  }
+
+  // Politique mot de passe (2.2)
+  const strengthJoin = checkPasswordStrength(data.password, { email, nom: `${data.nom} ${data.prenoms}` });
+  if (!strengthJoin.ok) {
+    return { ok: false, error: strengthJoin.error!, fieldErrors: { password: [strengthJoin.error!] } };
+  }
 
   // E-mail déjà utilisé
   const existe = await prisma.user.findUnique({ where: { email } });
@@ -86,7 +102,7 @@ export async function demanderInscriptionAction(
   const payload: OtpPayload = {
     purpose: "inscription",
     email,
-    code,
+    code: hashOtpCode(code), // stocké en hash, le code clair part par e-mail uniquement
     expiresAt: Date.now() + 10 * 60 * 1000,
     data: {
       nom: data.nom.trim().toUpperCase(),
@@ -113,8 +129,16 @@ export async function verifierInscriptionOtpAction(code: string): Promise<Rejoin
   if (!payload || payload.purpose !== "inscription") {
     return { ok: false, error: "Aucune demande d'inscription en cours ou code expiré." };
   }
-  if (payload.code !== code.trim()) {
-    return { ok: false, error: "Code incorrect." };
+  if (!verifyOtpCode(code, payload.code)) {
+    // Max 5 essais (item 1.2)
+    const attempts = (payload.attempts ?? 0) + 1;
+    if (attempts >= 5) {
+      await clearOtpCookie();
+      return { ok: false, error: "Trop de tentatives. Demande expirée, veuillez recommencer." };
+    }
+    payload.attempts = attempts;
+    await setOtpCookie(payload);
+    return { ok: false, error: `Code incorrect. (${attempts}/5 tentatives)` };
   }
 
   const d = payload.data as {
@@ -155,7 +179,8 @@ export async function renvoyerOtpAction(): Promise<RejoindreResult> {
     return { ok: false, error: "Aucune demande en cours." };
   }
   const code = generateOtpCode();
-  payload.code = code;
+  payload.code = hashOtpCode(code);
+  payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
   const { devCode } = await sendOtpEmail(payload.email, code);

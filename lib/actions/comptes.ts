@@ -12,6 +12,7 @@ import {
   type CompteUpdateInput,
   type ResetPasswordInput,
 } from "@/lib/schemas/parametres";
+import { checkPasswordStrength } from "@/lib/password";
 
 export type CompteResult =
   | { ok: true; message: string }
@@ -55,6 +56,13 @@ export async function creerCompteAction(
   }
 
   const email = data.email.trim().toLowerCase();
+
+  // Politique mot de passe (2.2)
+  const strengthCreate = checkPasswordStrength(data.password, { email, nom: data.nom });
+  if (!strengthCreate.ok) {
+    return { ok: false, error: strengthCreate.error!, fieldErrors: { password: [strengthCreate.error!] } };
+  }
+
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) {
     return {
@@ -167,6 +175,11 @@ export async function resetPasswordAction(
     where: { id: parsed.data.userId, groupeId },
   });
   if (!cible) return { ok: false, error: "Compte introuvable." };
+
+  const strengthReset = checkPasswordStrength(parsed.data.password, { email: cible.email, nom: cible.nom });
+  if (!strengthReset.ok) {
+    return { ok: false, error: strengthReset.error!, fieldErrors: { password: [strengthReset.error!] } };
+  }
 
   await prisma.user.update({
     where: { id: cible.id },

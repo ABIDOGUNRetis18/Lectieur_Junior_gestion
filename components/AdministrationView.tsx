@@ -207,7 +207,7 @@ export default function AdministrationView({
                               type="password"
                               value={newPwd}
                               onChange={(e) => setNewPwd(e.target.value)}
-                              placeholder="Nouveau mdp (8 car.)"
+                              placeholder="Nouveau mdp (12 car.)"
                               autoFocus
                             />
                             <button

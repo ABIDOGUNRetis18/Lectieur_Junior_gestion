@@ -135,7 +135,7 @@ async function importParsedRows(
     await prisma.historique.createMany({
       data: toCreate.map(({ r }) => ({
         action: "INSCRIPTION",
-        details: `${r.nom} ${r.prenoms} inscrit via import`,
+        details: `${r.nom} ${r.prenoms} inscrit via import (consentement parental supposé dans le fichier)`,
         utilisateurId: userId,
         groupeId,
       })),
@@ -176,6 +176,16 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
     return { ok: false, error: "Accès refusé.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
   }
 
+  // Limites serveur (item 2.5) — jamais d'exécution, texte seul
+  const MAX_CSV_CHARS = 5 * 1024 * 1024; // 5 Mo
+  const MAX_ROWS = 2000;
+  if (typeof csvText !== "string" || csvText.length === 0) {
+    return { ok: false, error: "Fichier vide.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  }
+  if (csvText.length > MAX_CSV_CHARS) {
+    return { ok: false, error: "Fichier trop volumineux (5 Mo maximum).", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  }
+
   // Fraternité cible (optionnelle, utilisée si le fichier n'en précise pas)
   let cibleFrat: { id: string; nom: string } | null = null;
   if (fraterniteId) {
@@ -192,6 +202,9 @@ export async function importerCsvAction(csvText: string, fraterniteId: string): 
   const rows = parseCsv(csvText);
   if (rows.length < 2) {
     return { ok: false, error: "Fichier CSV vide ou sans en-tête.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  }
+  if (rows.length > MAX_ROWS + 1) {
+    return { ok: false, error: `Trop de lignes (${rows.length}). Maximum ${MAX_ROWS} enfants par import.`, total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
   }
 
   const headerMap = mapHeaders(rows[0]);
@@ -329,6 +342,9 @@ export async function importerExcelAction(rows: ExcelRow[], fraterniteId: string
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return { ok: false, error: "Fichier Excel vide.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
+  }
+  if (rows.length > 2000) {
+    return { ok: false, error: "Trop de lignes. Maximum 2000 enfants par import.", total: 0, ajoutes: 0, doublons: 0, erreurs: [], details: [] };
   }
 
   const groupeId = session.user.groupeId;
