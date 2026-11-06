@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { getRevokedEpoch } from "@/lib/session-revoke";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -31,7 +32,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user) return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return null;
+        if (!ok) {
+          // Tentative échouée sur un compte existant : à tracer
+          await prisma.historique
+            .create({
+              data: {
+                action: "CONNEXION_ECHOUEE",
+                details: `Tentative de connexion échouée (${user.email})`,
+                utilisateurId: user.id,
+                groupeId: user.groupeId,
+              },
+            })
+            .catch(() => undefined);
+          return null;
+        }
+
+        await prisma.historique
+          .create({
+            data: {
+              action: "CONNEXION",
+              details: `Connexion réussie (${user.email})`,
+              utilisateurId: user.id,
+              groupeId: user.groupeId,
+            },
+          })
+          .catch(() => undefined);
 
         return {
           id: user.id,
@@ -45,12 +70,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async authorized({ auth, request }) {
+      const { pathname } = request.nextUrl;
+      // Routes publiques
+      if (pathname === "/" || pathname.startsWith("/connexion") || pathname.startsWith("/api/auth") || pathname.startsWith("/rejoindre")) {
+        return true;
+      }
+      return !!auth;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
         token.groupeId = (user as { groupeId?: string }).groupeId;
         token.fraterniteId = (user as { fraterniteId?: string | null }).fraterniteId;
+        token.issuedAt = Date.now();
       }
       // Rafraîchir les données utilisateur depuis la base (groupe/fraternité peuvent changer)
       if (token.email) {
@@ -58,11 +92,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email: token.email as string },
           select: { id: true, groupeId: true, fraterniteId: true, role: true },
         });
-        if (dbUser) {
-          token.id = dbUser.id;
-          token.groupeId = dbUser.groupeId;
-          token.fraterniteId = dbUser.fraterniteId;
-          token.role = dbUser.role;
+        if (!dbUser) {
+          // Utilisateur supprimé → invalider la session
+          return null;
+        }
+        token.id = dbUser.id;
+        token.groupeId = dbUser.groupeId;
+        token.fraterniteId = dbUser.fraterniteId;
+        token.role = dbUser.role;
+
+        // Si issuedAt n'est pas défini (anciens tokens), l'initialiser
+        if (!token.issuedAt) {
+          token.issuedAt = Date.now();
+        }
+
+        // Vérifier si les sessions ont été révoquées
+        if (token.groupeId) {
+          const revokedAt = await getRevokedEpoch(token.groupeId as string);
+          if (revokedAt && revokedAt > (token.issuedAt as number)) {
+            return null; // Session invalidée
+          }
         }
       }
       return token;

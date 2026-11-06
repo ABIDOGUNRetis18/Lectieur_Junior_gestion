@@ -101,20 +101,29 @@ export default function InscriptionForm({
       {/* Fraternité */}
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
         <h2 className="font-headline-sm text-headline-sm text-primary">Affectation fraternité</h2>
-        <label className="block font-label-md text-label-md text-on-surface" htmlFor="frat">
-          Choisir la fraternité active
-        </label>
-        <select
-          id="frat"
-          className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
-          value={fraterniteId}
-          onChange={(e) => setFraterniteId(e.target.value)}
-          disabled={soleUniqueFrat && fraternites.length === 1}
-        >
-          {fraternites.map((f) => (
-            <option key={f.id} value={f.id}>{f.nom}</option>
-          ))}
-        </select>
+        {soleUniqueFrat && fraternites.length === 1 ? (
+          // Responsable : une seule fraternité possible, pas de dropdown inutile
+          <p className="font-body-md text-body-md text-on-surface flex items-center gap-space-xs">
+            <span className="material-symbols-outlined text-[18px] text-primary">groups</span>
+            {fraternites[0].nom}
+          </p>
+        ) : (
+          <>
+            <label className="block font-label-md text-label-md text-on-surface" htmlFor="frat">
+              Choisir la fraternité active
+            </label>
+            <select
+              id="frat"
+              className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
+              value={fraterniteId}
+              onChange={(e) => setFraterniteId(e.target.value)}
+            >
+              {fraternites.map((f) => (
+                <option key={f.id} value={f.id}>{f.nom}</option>
+              ))}
+            </select>
+          </>
+        )}
       </section>
 
       {/* Enfants */}

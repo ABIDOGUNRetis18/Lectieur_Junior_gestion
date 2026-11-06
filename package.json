@@ -16,6 +16,11 @@
   "prisma": {
     "seed": "node prisma/seed.js"
   },
+  "allowScripts": {
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true,
+    "core-js@3.51.0": true
+  },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",

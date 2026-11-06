@@ -1,8 +1,6 @@
-/**
- * Couche d'accès aux données (DAL).
- * Règle : TOUTE requête est filtrée par le groupeId de l'utilisateur connecté.
- * On centralise ce filtre ici plutôt que de le répéter dans chaque action.
- */
+import "server-only";
+
+/** Couche d'accès aux données (DAL). */
 import { requireRole, requireGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 
@@ -37,6 +35,36 @@ export async function getFraternitesAvecCount() {
 export async function getFraterniteById(id: string) {
   const groupeId = await requireGroup();
   return prisma.fraternite.findFirst({ where: { id, groupeId } });
+}
+
+/** Statistiques d'une fraternité : nb de présences « présent » + total des cotisations. */
+export async function getStatsFraternite(fraterniteId: string) {
+  const groupeId = await requireGroup();
+  const enfants = await prisma.enfant.findMany({
+    where: { groupeId, fraterniteId, statut: "ACTIF" },
+    select: { id: true },
+  });
+  const enfantIds = enfants.map((e) => e.id);
+
+  if (enfantIds.length === 0) {
+    return { presencesPresentes: 0, totalCotisations: 0, enfantsCount: 0 };
+  }
+
+  const [presencesPresentes, totalCotisations] = await Promise.all([
+    prisma.presence.count({
+      where: { groupeId, enfantId: { in: enfantIds }, etat: "PRESENT" },
+    }),
+    prisma.cotisation.aggregate({
+      where: { groupeId, enfantId: { in: enfantIds } },
+      _sum: { montant: true },
+    }),
+  ]);
+
+  return {
+    presencesPresentes,
+    totalCotisations: totalCotisations._sum.montant ?? 0,
+    enfantsCount: enfants.length,
+  };
 }
 
 // ---------- Enfants (lecture) ----------
@@ -98,12 +126,12 @@ export async function getAdminsAndResponsables() {
     include: { fraternite: true },
     orderBy: { nom: "asc" },
   });
-  const responsablesEnfants = await prisma.enfant.findMany({
-    where: { groupeId, role: "RESPONSABLE", statut: "ACTIF" },
+  const responsables = await prisma.user.findMany({
+    where: { groupeId, role: "RESPONSABLE" },
     include: { fraternite: true },
     orderBy: [{ fraternite: { nom: "asc" } }, { nom: "asc" }],
   });
-  return { admins, responsablesEnfants };
+  return { admins, responsables };
 }
 
 // ---------- Groupe ----------

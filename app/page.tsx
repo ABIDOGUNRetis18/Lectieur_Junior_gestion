@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 
+export const instant = false;
+
 const PILIERS = [
   {
     icon: "how_to_reg",
@@ -58,14 +60,24 @@ export default function Home() {
               </span>
             </div>
           </div>
-          <Link
-            href="/connexion"
-            className="shrink-0 inline-flex items-center justify-center gap-space-xs h-[44px] px-space-sm sm:px-space-md rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg hover:bg-primary transition-colors shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">login</span>
-            <span className="hidden sm:inline">Accéder à l&apos;espace</span>
-            <span className="sm:hidden">Connexion</span>
-          </Link>
+          <div className="flex items-center gap-space-sm">
+            <Link
+              href="/rejoindre"
+              className="shrink-0 inline-flex items-center justify-center gap-space-xs h-[44px] px-space-sm sm:px-space-md rounded-lg border border-primary-container text-primary-container font-label-lg text-label-lg hover:bg-primary-container hover:text-on-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              <span className="hidden sm:inline">Créer un compte</span>
+              <span className="sm:hidden">Inscrire</span>
+            </Link>
+            <Link
+              href="/connexion"
+              className="shrink-0 inline-flex items-center justify-center gap-space-xs h-[44px] px-space-sm sm:px-space-md rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg hover:bg-primary transition-colors shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">login</span>
+              <span className="hidden sm:inline">Connexion</span>
+              <span className="sm:hidden">Connexion</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -93,7 +105,14 @@ export default function Home() {
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-space-sm h-[52px] px-space-xl rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-md hover:bg-primary transition-all"
                   >
                     <span className="material-symbols-outlined text-[20px]">login</span>
-                    <span>Accéder à l&apos;espace de gestion</span>
+                    <span>Connexion</span>
+                  </Link>
+                  <Link
+                    href="/rejoindre"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-space-sm h-[52px] px-space-xl rounded-lg border-2 border-primary-container text-primary-container font-label-lg text-label-lg hover:bg-primary-container hover:text-on-primary transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">person_add</span>
+                    <span>Créer un compte</span>
                   </Link>
                 </div>
 
@@ -243,13 +262,20 @@ export default function Home() {
               Connectez-vous avec vos identifiants pour ouvrir la feuille d&apos;appel et préparer la
               proclamation des textes sacrés.
             </p>
-            <div className="mt-space-xl">
+            <div className="mt-space-xl flex flex-wrap items-center justify-center gap-space-md">
               <Link
                 href="/connexion"
                 className="inline-flex items-center justify-center gap-space-sm h-[52px] px-space-xl rounded-lg bg-surface-container-lowest text-primary-container font-label-lg text-label-lg shadow-lg hover:bg-surface-container-low transition-all"
               >
-                <span className="material-symbols-outlined text-[20px]">lock_open</span>
-                <span>Ouvrir ma session</span>
+                <span className="material-symbols-outlined text-[20px]">login</span>
+                <span>Connexion</span>
+              </Link>
+              <Link
+                href="/rejoindre"
+                className="inline-flex items-center justify-center gap-space-sm h-[52px] px-space-xl rounded-lg border-2 border-surface-container-lowest text-surface-container-lowest font-label-lg text-label-lg hover:bg-surface-container-lowest hover:text-primary-container transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">person_add</span>
+                <span>Créer un compte</span>
               </Link>
             </div>
           </div>

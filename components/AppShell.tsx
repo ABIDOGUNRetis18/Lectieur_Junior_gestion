@@ -5,6 +5,17 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import Toaster from "@/components/Toaster";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { tracerDeconnexionAction } from "@/lib/actions/session";
+
+/** Trace la déconnexion puis détruit la session (best-effort). */
+async function handleSignOut() {
+  try {
+    await tracerDeconnexionAction();
+  } catch {
+    // ignore : la déconnexion doit toujours réussir
+  }
+  await signOut({ callbackUrl: "/connexion" });
+}
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrateur",
@@ -12,13 +23,27 @@ const ROLE_LABEL: Record<string, string> = {
   FRATERNITE: "Fraternité",
 };
 
-const NAV = [
-  { href: "/tableau-de-bord", label: "Tableau de bord", short: "Accueil", icon: "dashboard" },
+const NAV_BASE = [
+  { href: "/responsable/tableau-de-bord", label: "Tableau de bord", short: "Accueil", icon: "dashboard" },
   { href: "/inscription", label: "Inscription", short: "Inscription", icon: "person_add" },
   { href: "/presence", label: "Présence", short: "Présence", icon: "fact_check" },
   { href: "/cotisation", label: "Cotisation", short: "Cotisation", icon: "payments" },
   { href: "/consultation", label: "Consultation", short: "Consultation", icon: "menu_book" },
-  { href: "/administration", label: "Administration", short: "Admin", icon: "admin_panel_settings" },
+  { href: "/import", label: "Import", short: "Import", icon: "upload_file" },
+  { href: "/profil", label: "Profil", short: "Profil", icon: "person" },
+];
+
+const NAV_ADMIN = [
+  { href: "/admin/tableau-de-bord", label: "Tableau de bord", short: "Accueil", icon: "dashboard" },
+  { href: "/inscription", label: "Inscription", short: "Inscription", icon: "person_add" },
+  { href: "/presence", label: "Présence", short: "Présence", icon: "fact_check" },
+  { href: "/cotisation", label: "Cotisation", short: "Cotisation", icon: "payments" },
+  { href: "/consultation", label: "Consultation", short: "Consultation", icon: "menu_book" },
+  { href: "/import", label: "Import", short: "Import", icon: "upload_file" },
+  { href: "/admin/administration", label: "Administration", short: "Admin", icon: "admin_panel_settings" },
+  { href: "/admin/parametres", label: "Paramètres", short: "Param.", icon: "settings" },
+  { href: "/admin/historique", label: "Historique", short: "Historique", icon: "history" },
+  { href: "/profil", label: "Profil", short: "Profil", icon: "person" },
 ];
 
 export default function AppShell({
@@ -33,13 +58,14 @@ export default function AppShell({
   const role = session?.user?.role ?? "";
   const roleLabel = ROLE_LABEL[role] ?? role;
   const isAdmin = role === "ADMIN";
+  const nav = isAdmin ? NAV_ADMIN : NAV_BASE;
 
   return (
     <div className="flex min-h-screen bg-surface">
       {/* Sidebar - Desktop only */}
       <aside className="hidden lg:flex flex-col w-64 bg-surface-container-lowest border-r border-outline-variant fixed h-full">
         <div className="p-4 border-b border-outline-variant">
-          <Link href="/tableau-de-bord" className="flex items-center gap-3">
+          <Link href={isAdmin ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord"} className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="Logo Paroisse Saint-Michel Gbeto"
@@ -53,12 +79,7 @@ export default function AppShell({
           </Link>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {[
-            ...NAV,
-            ...(isAdmin
-              ? [{ href: "/historique", label: "Historique", short: "Historique", icon: "history" }]
-              : []),
-          ].map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
@@ -87,7 +108,7 @@ export default function AppShell({
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/connexion" })}
+            onClick={handleSignOut}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container-highest transition-colors"
           >
             <span className="material-symbols-outlined text-[20px]">logout</span>
@@ -102,7 +123,7 @@ export default function AppShell({
         <header className="lg:hidden fixed top-0 w-full z-50 pt-safe bg-primary/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.12)]">
           <div className="h-16 px-margin flex items-center justify-between gap-space-sm max-w-lg mx-auto">
             <div className="flex items-center gap-space-sm min-w-0 flex-1">
-              <Link href="/tableau-de-bord" className="flex items-center gap-space-sm min-w-0">
+              <Link href={isAdmin ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord"} className="flex items-center gap-space-sm min-w-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt="Logo Paroisse Saint-Michel Gbeto"
@@ -136,7 +157,7 @@ export default function AppShell({
                 aria-label="Déconnexion"
                 className="w-11 h-11 rounded-full flex items-center justify-center text-primary-fixed-dim hover:text-on-primary hover:bg-primary-container/60 transition-colors"
                 title="Déconnexion"
-                onClick={() => signOut({ callbackUrl: "/connexion" })}
+                onClick={handleSignOut}
               >
                 <span className="material-symbols-outlined text-[22px]">logout</span>
               </button>
@@ -149,7 +170,7 @@ export default function AppShell({
 
         {/* Desktop header */}
         <header className="hidden lg:block bg-primary/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.12)]">
-          <div className="h-16 px-6 flex items-center justify-between gap-4">
+          <div className="h-16 px-6 flex items-center justify-between">
             <h1 className="font-headline-sm text-headline-sm text-on-primary">{title}</h1>
             {roleLabel && (
               <span className="inline-block px-3 py-1 bg-primary-container text-primary-fixed font-label-sm text-label-sm rounded uppercase">
@@ -166,12 +187,7 @@ export default function AppShell({
         {/* Bottom Nav - Mobile only */}
         <nav className="lg:hidden fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
           <div className="flex items-stretch h-16 px-space-xs max-w-lg mx-auto overflow-x-auto overscroll-x-contain">
-            {[
-              ...NAV,
-              ...(isAdmin
-                ? [{ href: "/historique", label: "Historique", short: "Historique", icon: "history" }]
-                : []),
-            ].map((item) => {
+            {nav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link

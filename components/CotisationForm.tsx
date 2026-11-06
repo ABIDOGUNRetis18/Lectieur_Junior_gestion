@@ -95,18 +95,21 @@ export default function CotisationForm({ fraternites, dimanches, enfantsByFrat, 
           </select>
         </div>
 
-        <div className="space-y-space-xs">
-          <label className="block font-label-md text-label-md text-on-surface">Fraternité</label>
-          <select
-            className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
-            value={fratId}
-            onChange={(e) => setFratId(e.target.value)}
-          >
-            {fraternites.map((f) => (
-              <option key={f.id} value={f.id}>{f.nom}</option>
-            ))}
-          </select>
-        </div>
+        {/* Un responsable ne gère qu'une seule fraternité : le filtre serait inutile */}
+        {fraternites.length > 1 && (
+          <div className="space-y-space-xs">
+            <label className="block font-label-md text-label-md text-on-surface">Fraternité</label>
+            <select
+              className="w-full h-[48px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm"
+              value={fratId}
+              onChange={(e) => setFratId(e.target.value)}
+            >
+              {fraternites.map((f) => (
+                <option key={f.id} value={f.id}>{f.nom}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </section>
 
       {/* Caisse du jour */}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   changerStatutEnfantAction,
   supprimerEnfantAction,
@@ -40,6 +41,9 @@ const FIELD = "w-full h-[44px] rounded-lg bg-surface-container-lowest text-on-su
 
 export default function EnfantFiche({ enfant, fraternites }: Props) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const dashboardHref =
+    session?.user?.role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
   const storedSerie = enfant.serie ?? "";
   const initialSerie = storedSerie.startsWith("Autre: ") ? "AUTRE" : storedSerie;
   const initialSerieAutre = storedSerie.startsWith("Autre: ") ? storedSerie.slice(7) : "";
@@ -85,7 +89,7 @@ export default function EnfantFiche({ enfant, fraternites }: Props) {
     setBusy(false);
     if (res.ok) {
       toastSuccess(res.message!);
-      router.push("/tableau-de-bord");
+      router.push(dashboardHref);
     } else {
       setMsg({ ok: false, text: res.error });
       toastError(res.error);
@@ -206,9 +210,13 @@ export default function EnfantFiche({ enfant, fraternites }: Props) {
             </div>
             <div className="space-y-space-xs">
               <label className="block font-label-md text-label-md text-on-surface">Fraternité</label>
-              <select className={FIELD} value={edit.fraterniteId} onChange={(e) => setEdit({ ...edit, fraterniteId: e.target.value })}>
-                {fraternites.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
-              </select>
+              {fraternites.length > 1 ? (
+                <select className={FIELD} value={edit.fraterniteId} onChange={(e) => setEdit({ ...edit, fraterniteId: e.target.value })}>
+                  {fraternites.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
+                </select>
+              ) : (
+                <p className={`${FIELD} flex items-center`}>{fraternites[0]?.nom ?? "—"}</p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">

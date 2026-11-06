@@ -3,6 +3,7 @@
 import { requireRole, assertFraterniteInGroup } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { invalidateRevokedEpochCache } from "@/lib/session-revoke";
 import {
   compteCreateSchema,
   compteUpdateSchema,
@@ -45,7 +46,6 @@ export async function creerCompteAction(
   }
   const data = parsed.data;
 
-  // Responsable : fraternité obligatoire et dans le groupe
   if (data.fraterniteId) {
     try {
       await assertFraterniteInGroup(data.fraterniteId, groupeId);
@@ -120,11 +120,9 @@ export async function updateCompteAction(
     }
   }
 
-  // Ne jamais se retirer soi-même le rôle ADMIN
   if (cible.id === session.user.id && data.role !== "ADMIN") {
     return { ok: false, error: "Vous ne pouvez pas changer votre propre rôle." };
   }
-  // Ne jamais retirer le dernier admin du groupe
   if (cible.role === "ADMIN" && data.role !== "ADMIN") {
     const restants = await countAdmins(groupeId, cible.id);
     if (restants === 0) {
@@ -219,4 +217,24 @@ export async function supprimerCompteAction(userId: string): Promise<CompteResul
   });
 
   return { ok: true, message: `Compte de ${cible.nom} supprimé.` };
+}
+
+// ---------- Révocation de toutes les sessions ----------
+
+export async function revokeAllSessionsAction(): Promise<CompteResult> {
+  const session = await requireRole("ADMIN");
+  const groupeId = session.user.groupeId;
+
+  await prisma.historique.create({
+    data: {
+      action: "SESSIONS_REVOKED",
+      details: `Sessions révoquées par ${session.user.email ?? session.user.id}`,
+      utilisateurId: session.user.id,
+      groupeId,
+    },
+  });
+
+  invalidateRevokedEpochCache(groupeId);
+
+  return { ok: true, message: "Toutes les sessions ont été révoquées. Les utilisateurs devront se reconnecter." };
 }

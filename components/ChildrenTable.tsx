@@ -43,6 +43,9 @@ export default function ChildrenTable({ enfants, fraternites }: ChildrenTablePro
   const [bulkBusy, setBulkBusy] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
+  // Un responsable ne gère qu'une seule fraternité : le filtre serait inutile
+  const showFraterniteFilter = fraternites.length > 1;
+
   const filteredEnfants = useMemo(() => {
     return enfants.filter((enfant) => {
       const matchesSearch =
@@ -156,23 +159,25 @@ export default function ChildrenTable({ enfants, fraternites }: ChildrenTablePro
     <div className="space-y-space-md">
       {/* Filters */}
       <form className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+        <div className={`grid grid-cols-1 gap-space-sm ${showFraterniteFilter ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <input
             className="h-[44px] rounded-lg border border-outline-variant px-space-sm font-body-md"
             placeholder="Rechercher nom, prénom ou ID…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <select
-            className="h-[44px] rounded-lg border border-outline-variant px-space-sm font-body-md"
-            value={frat}
-            onChange={(e) => setFrat(e.target.value)}
-          >
-            <option value="">Toutes les fraternités</option>
-            {fraternites.map((f) => (
-              <option key={f.id} value={f.nom}>{f.nom}</option>
-            ))}
-          </select>
+          {showFraterniteFilter && (
+            <select
+              className="h-[44px] rounded-lg border border-outline-variant px-space-sm font-body-md"
+              value={frat}
+              onChange={(e) => setFrat(e.target.value)}
+            >
+              <option value="">Toutes les fraternités</option>
+              {fraternites.map((f) => (
+                <option key={f.id} value={f.nom}>{f.nom}</option>
+              ))}
+            </select>
+          )}
           <select
             className="h-[44px] rounded-lg border border-outline-variant px-space-sm font-body-md"
             value={statut}

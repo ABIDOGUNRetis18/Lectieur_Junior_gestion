@@ -11,6 +11,8 @@ import { toastError } from "@/lib/toast";
 function ConnexionForm() {
   const router = useRouter();
   const params = useSearchParams();
+  // "/tableau-de-bord" est l'URL commune : proxy.ts la redirige vers
+  // /admin/tableau-de-bord ou /responsable/tableau-de-bord selon le rôle.
   const callbackUrl = params.get("callbackUrl") ?? "/tableau-de-bord";
 
   const [identifier, setIdentifier] = useState("");

@@ -13,14 +13,25 @@ export default async function ConsultationPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireRole("ADMIN", "RESPONSABLE");
+  const session = await requireRole("ADMIN", "RESPONSABLE");
   const groupe = await getGroupeCourant();
   const params = await searchParams;
   const annee = params.annee ? Number(params.annee) : new Date().getFullYear();
   const mois = params.mois ? Number(params.mois) : null;
-  const fraterniteId = params.fraternite || null;
+
+  // Un responsable ne consulte QUE les données de sa fraternité :
+  // son filtre est forcé côté serveur (ignoré s'il tente ?fraternite=autre).
+  const estResponsable = session.user.role === "RESPONSABLE";
+  const fraterniteId = estResponsable
+    ? session.user.fraterniteId
+    : params.fraternite || null;
 
   const data = await getConsultationData(groupe!.id, { annee, mois, fraterniteId });
+
+  if (estResponsable) {
+    // Pas de liste déroulante des autres fraternités pour un responsable
+    data.fraternites = data.fraternites.filter((f) => f.id === session.user.fraterniteId);
+  }
 
   return (
     <AppShell title="Consultation">

@@ -6,7 +6,7 @@ import AppShell from "@/components/AppShell";
 import EnfantFiche from "@/components/EnfantFiche";
 
 // Cette page lit la session et la base hors <Suspense> : rendu bloquant requis
-// avec cacheComponents (voir app/tableau-de-bord/page.tsx).
+// avec cacheComponents (voir app/admin/tableau-de-bord/page.tsx).
 export const instant = false;
 
 export default async function EnfantPage({
@@ -25,7 +25,7 @@ export default async function EnfantPage({
     session.user.role === "RESPONSABLE" &&
     session.user.fraterniteId !== enfant.fraterniteId
   ) {
-    redirect("/tableau-de-bord");
+    redirect("/responsable/tableau-de-bord");
   }
 
   const fraternites = await getFraternites();
@@ -34,11 +34,13 @@ export default async function EnfantPage({
       ? fraternites.filter((f) => f.id === session.user.fraterniteId)
       : fraternites;
 
+  const dashboardHref = session.user.role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
+
   return (
     <AppShell title="Fiche enfant">
       <div className="px-margin pt-space-md">
         <Link
-          href="/tableau-de-bord"
+          href={dashboardHref}
           className="inline-flex items-center gap-space-xs font-label-md text-label-md text-primary hover:underline"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>

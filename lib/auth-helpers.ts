@@ -1,3 +1,5 @@
+import "server-only";
+
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -32,7 +34,8 @@ export async function requireAuth() {
 export async function requireRole(...roles: Role[]) {
   const session = await requireAuth();
   if (!roles.includes(session.user.role as Role)) {
-    redirect("/tableau-de-bord");
+    const target = session.user.role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
+    redirect(target);
   }
   return session;
 }

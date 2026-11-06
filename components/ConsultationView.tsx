@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { tracerExportAction } from "@/lib/actions/session";
 
 type Enfant = { id: string; nom: string; prenoms: string; fraterniteId: string; fraterniteNom: string };
 type Data = {
@@ -36,6 +37,9 @@ export default function ConsultationView({ data }: { data: Data }) {
   const [mois, setMois] = useState<string>(data.filters.mois ? String(data.filters.mois) : "");
   const [frat, setFrat] = useState(data.filters.fraterniteId ?? "");
 
+  // Un responsable n'a qu'une fraternité : le filtre serait inutile
+  const showFraterniteFilter = data.fraternites.length > 1;
+
   function apply() {
     const params = new URLSearchParams();
     params.set("annee", String(annee));
@@ -45,7 +49,9 @@ export default function ConsultationView({ data }: { data: Data }) {
   }
 
   // --- Export Excel ---
-  function exportExcel() {
+  async function exportExcel() {
+    // Traçage best-effort : un échec ne doit pas bloquer l'export
+    await tracerExportAction("EXCEL", data.filters.annee).catch(() => undefined);
     const wb = XLSX.utils.book_new();
     // Feuille présence
     const header = ["Nom", "Prénoms", "Fraternité", ...data.dimanches.map((d) => d), "P", "Perm", "A"];
@@ -89,7 +95,8 @@ export default function ConsultationView({ data }: { data: Data }) {
   }
 
   // --- Export PDF ---
-  function exportPDF() {
+  async function exportPDF() {
+    await tracerExportAction("PDF", data.filters.annee).catch(() => undefined);
     const doc = new jsPDF({ orientation: "landscape" });
     doc.text(`Consultation ${data.filters.annee}`, 14, 14);
     const head = [["Nom", "Prénoms", ...data.dimanches.map((d) => d.slice(5)), "P", "Perm", "A"]];
@@ -113,7 +120,7 @@ export default function ConsultationView({ data }: { data: Data }) {
       {/* Filtres */}
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
         <h2 className="font-headline-sm text-headline-sm text-primary">Filtres</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+        <div className={`grid grid-cols-1 gap-space-sm ${showFraterniteFilter ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <div className="space-y-space-xs">
             <label className="block font-label-md text-label-md text-on-surface">Année</label>
             <select className="w-full h-[44px] rounded-lg border border-outline-variant px-space-sm" value={annee} onChange={(e) => setAnnee(Number(e.target.value))}>
@@ -131,15 +138,17 @@ export default function ConsultationView({ data }: { data: Data }) {
               ))}
             </select>
           </div>
-          <div className="space-y-space-xs">
-            <label className="block font-label-md text-label-md text-on-surface">Fraternité</label>
-            <select className="w-full h-[44px] rounded-lg border border-outline-variant px-space-sm" value={frat} onChange={(e) => setFrat(e.target.value)}>
-              <option value="">Toutes</option>
-              {data.fraternites.map((f) => (
-                <option key={f.id} value={f.id}>{f.nom}</option>
-              ))}
-            </select>
-          </div>
+          {showFraterniteFilter && (
+            <div className="space-y-space-xs">
+              <label className="block font-label-md text-label-md text-on-surface">Fraternité</label>
+              <select className="w-full h-[44px] rounded-lg border border-outline-variant px-space-sm" value={frat} onChange={(e) => setFrat(e.target.value)}>
+                <option value="">Toutes</option>
+                {data.fraternites.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nom}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-space-sm pt-1">
           <button onClick={apply} className="h-[44px] px-space-md rounded-lg bg-primary-container text-on-primary font-label-md">
@@ -266,20 +275,20 @@ export default function ConsultationView({ data }: { data: Data }) {
       {/* Cotisations par fraternité et par mois */}
       <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
         <h2 className="font-headline-sm text-headline-sm text-primary">Cotisations</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-          <div>
-            <h3 className="font-label-md text-label-md text-on-surface mb-1">Par fraternité (année)</h3>
-            <ul className="space-y-1">
-              {data.fraternites
-                .filter((f) => data.cotisationParFrat[f.id] !== undefined || true)
-                .map((f) => (
+        <div className={`grid grid-cols-1 gap-space-md ${showFraterniteFilter ? "sm:grid-cols-2" : ""}`}>
+          {showFraterniteFilter && (
+            <div>
+              <h3 className="font-label-md text-label-md text-on-surface mb-1">Par fraternité (année)</h3>
+              <ul className="space-y-1">
+                {data.fraternites.map((f) => (
                   <li key={f.id} className="flex justify-between font-body-sm">
                     <span>{f.nom}</span>
                     <span className="font-bold">{data.cotisationParFrat[f.id] ?? 0} F</span>
                   </li>
                 ))}
-            </ul>
-          </div>
+              </ul>
+            </div>
+          )}
           <div>
             <h3 className="font-label-md text-label-md text-on-surface mb-1">Par mois (année)</h3>
             <ul className="space-y-1">

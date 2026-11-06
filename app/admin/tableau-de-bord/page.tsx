@@ -1,14 +1,10 @@
 import Link from "next/link";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireRole } from "@/lib/auth-helpers";
 import { getFraternites, getFraternitesAvecCount, getEnfants } from "@/lib/dal";
 
 import AppShell from "@/components/AppShell";
 import ChildrenTable from "@/components/ChildrenTable";
 
-// Next.js 16 (cacheComponents) : cette page lit la session et la base de données
-// hors <Suspense>. `instant = false` autorise le rendu bloquant ; sans cela le
-// prerender Vercel échoue sur /tableau-de-bord. Ne pas le remplacer par
-// `dynamic` ou `revalidate`, incompatibles avec cacheComponents.
 export const instant = false;
 
 // Palette de couleurs pour les fraternités
@@ -27,11 +23,11 @@ function getFraternityColor(index: number) {
   return FRATERNITY_COLORS[index % FRATERNITY_COLORS.length];
 }
 
-export default async function TableauDeBordPage() {
-  const session = await requireAuth();
+export default async function AdminTableauDeBordPage() {
+  await requireRole("ADMIN");
   const fraternitesAvecCount = await getFraternitesAvecCount();
   const fraternites = await getFraternites();
-  const enfants = await (session.user.role === "RESPONSABLE" && session.user.fraterniteId ? getEnfants(session.user.fraterniteId) : getEnfants());
+  const enfants = await getEnfants();
 
   return (
     <AppShell title="Tableau de bord">
@@ -87,36 +83,32 @@ export default async function TableauDeBordPage() {
           )}
         </section>
 
-        {session.user.role === "ADMIN" && (
-          <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
-            <h2 className="font-headline-sm text-headline-sm text-primary">Administration</h2>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Paramètres du groupe (cotisation, premier dimanche, mois sans réunion) et comptes
-              utilisateurs.
-            </p>
-            <Link
-              href="/parametres"
-              className="inline-flex h-[44px] items-center px-space-md rounded-lg bg-primary text-on-primary font-label-md"
-            >
-              Ouvrir les paramètres
-            </Link>
-          </section>
-        )}
+        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
+          <h2 className="font-headline-sm text-headline-sm text-primary">Administration</h2>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Paramètres du groupe (cotisation, premier dimanche, mois sans réunion) et comptes
+            utilisateurs.
+          </p>
+          <Link
+            href="/admin/parametres"
+            className="inline-flex h-[44px] items-center px-space-md rounded-lg bg-primary text-on-primary font-label-md"
+          >
+            Ouvrir les paramètres
+          </Link>
+        </section>
 
-        {(session.user.role === "ADMIN" || session.user.role === "RESPONSABLE") && (
-          <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
-            <h2 className="font-headline-sm text-headline-sm text-primary">Importer le registre existant</h2>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Reprise des enfants depuis un fichier CSV ou Excel (avec détection des doublons).
-            </p>
-            <Link
-              href="/import"
-              className="inline-flex h-[44px] items-center px-space-md rounded-lg bg-primary-container text-on-primary font-label-md"
-            >
-              Ouvrir l&apos;import
-            </Link>
-          </section>
-        )}
+        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
+          <h2 className="font-headline-sm text-headline-sm text-primary">Importer le registre existant</h2>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Reprise des enfants depuis un fichier CSV ou Excel (avec détection des doublons).
+          </p>
+          <Link
+            href="/import"
+            className="inline-flex h-[44px] items-center px-space-md rounded-lg bg-primary-container text-on-primary font-label-md"
+          >
+            Ouvrir l&apos;import
+          </Link>
+        </section>
       </div>
     </AppShell>
   );
