@@ -24,6 +24,11 @@ jobs:
 
       - run: npm ci
 
+      - name: Prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://user:password@host-pooler.region.aws.neon.tech/dbname?sslmode=require
+
       - name: Typecheck
         run: npx tsc --noEmit
 
