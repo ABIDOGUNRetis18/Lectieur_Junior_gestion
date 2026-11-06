@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/connexion", "/api/auth", "/rejoindre"];
+const PUBLIC_PATHS = ["/connexion", "/api/auth", "/rejoindre", "/mot-de-passe-oublie"];
 
 // Redirections basées sur le rôle
 const ROLE_REDIRECTS: Record<string, string> = {

@@ -73,7 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
       // Routes publiques
-      if (pathname === "/" || pathname.startsWith("/connexion") || pathname.startsWith("/api/auth") || pathname.startsWith("/rejoindre")) {
+      if (pathname === "/" || pathname.startsWith("/connexion") || pathname.startsWith("/api/auth") || pathname.startsWith("/rejoindre") || pathname.startsWith("/mot-de-passe-oublie")) {
         return true;
       }
       return !!auth;

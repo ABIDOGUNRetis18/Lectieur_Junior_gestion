@@ -62,7 +62,7 @@ export function decryptOtpPayload<T = unknown>(token: string): T | null {
 }
 
 export type OtpPayload = {
-  purpose: "inscription" | "changement_email";
+  purpose: "inscription" | "changement_email" | "reset_password";
   email: string;
   code: string;
   expiresAt: number;

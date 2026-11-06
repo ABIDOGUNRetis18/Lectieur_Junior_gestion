@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
-import Toaster from "@/components/Toaster";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { tracerDeconnexionAction } from "@/lib/actions/session";
 
@@ -210,7 +209,6 @@ export default function AppShell({
           </div>
         </nav>
       </div>
-      <Toaster />
       <ConfirmDialog />
     </div>
   );

@@ -19,25 +19,34 @@ function ConnexionForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const res = await signIn("credentials", {
-      email: identifier,
-      password,
-      redirect: false,
-    });
-    setLoading(false);
-    // Auth.js renvoie HTTP 200 même en cas d'échec : l'erreur est dans res.error
-    if (res?.ok && !res.error) {
-      router.push(callbackUrl);
-      router.refresh();
-    } else {
-      toastError(
-        "Échec de l'authentification",
-        "Identifiants incorrects. Vérifiez avec le bureau paroissial ou réessayez."
-      );
+    setError(null);
+    try {
+      const res = await signIn("credentials", {
+        email: identifier.trim().toLowerCase(),
+        password,
+        redirect: false,
+      });
+      // Auth.js renvoie HTTP 200 même en cas d'échec : l'erreur est dans res.error
+      if (res?.ok && !res.error) {
+        router.push(callbackUrl);
+        router.refresh();
+      } else {
+        const message =
+          "E-mail ou mot de passe incorrect. Vérifiez vos identifiants et réessayez.";
+        setError(message);
+        toastError("Échec de la connexion", message);
+      }
+    } catch {
+      const message = "Erreur de connexion au serveur. Réessayez dans un instant.";
+      setError(message);
+      toastError("Échec de la connexion", message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -95,6 +104,16 @@ function ConnexionForm() {
             </div>
           </div>
 
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-error/40 bg-error-container px-space-md py-space-sm flex items-start gap-space-xs"
+            >
+              <span className="material-symbols-outlined text-[20px] text-error shrink-0 mt-0.5">error</span>
+              <p className="font-body-sm text-body-sm text-on-error-container">{error}</p>
+            </div>
+          )}
+
           <div className="space-y-space-xs">
             <div className="flex justify-between items-baseline">
               <label
@@ -103,6 +122,12 @@ function ConnexionForm() {
               >
                 Mot de passe
               </label>
+              <a
+                href="/mot-de-passe-oublie"
+                className="font-label-sm text-label-sm text-primary underline"
+              >
+                Mot de passe oublié ?
+              </a>
             </div>
             <div className="relative rounded-xl border border-surface-container-highest/80 bg-surface-container-lowest shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
               <div className="absolute inset-y-0 left-0 pl-space-md flex items-center pointer-events-none text-outline">
