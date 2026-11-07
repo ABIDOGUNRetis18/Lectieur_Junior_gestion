@@ -7,10 +7,21 @@ export type ConsultationFilters = {
   fraterniteId: string | null; // null = toutes
 };
 
-export async function getConsultationData(groupeId: string, filters: ConsultationFilters) {
-  const groupe = await prisma.groupe.findUnique({ where: { id: groupeId } });
-  if (!groupe) throw new Error("Groupe introuvable");
+/** Champs du groupe nécessaires au calcul (évite un re-fetch en base). */
+export type GroupeConsultation = {
+  id: string;
+  nom: string;
+  premierDimanche: Date;
+  moisDebutAnnee: number;
+  moisSansReunion: number[];
+  montantCotisation: number;
+};
 
+export async function getConsultationData(
+  groupe: GroupeConsultation,
+  filters: ConsultationFilters,
+) {
+  const groupeId = groupe.id;
   const allDimanches = getDimanchesValides(groupe, 1000); // enough
 
   // Filter dimanches by year (and month if specified)
@@ -23,30 +34,48 @@ export async function getConsultationData(groupeId: string, filters: Consultatio
     return true;
   });
 
-  // Enfants
-  const enfants = await prisma.enfant.findMany({
-    where: {
-      groupeId,
-      ...(filters.fraterniteId ? { fraterniteId: filters.fraterniteId } : {}),
-    },
-    include: { fraternite: true },
-    orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
-  });
+  // Enfants, fraternités, présences et cotisations sont indépendants :
+  // on les lance tous en parallèle (le périmètre passe par la relation enfant).
+  const enfantScope = {
+    groupeId,
+    ...(filters.fraterniteId ? { fraterniteId: filters.fraterniteId } : {}),
+  };
 
-  const enfantIds = enfants.map((e) => e.id);
+  const dimanchesAnnee = allDimanches.filter((d) => {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Porto-Novo", year: "numeric" }).formatToParts(d);
+    return parseInt(parts.find((p) => p.type === "year")!.value, 10) === filters.annee;
+  });
+  const datesAnnee = dimanchesAnnee.map(
+    (d) => new Date(d.toISOString().slice(0, 10) + "T00:00:00Z"),
+  );
 
-  // Présences pour les dimanches sélectionnés
-  const dateObjs = dimanches.map((d) => {
-    const iso = d.toISOString().slice(0, 10);
-    return new Date(iso + "T00:00:00Z");
-  });
+  // Une seule passe pour toute l'année : les dimanches sélectionnés sont un
+  // sous-ensemble, filtré en mémoire plus bas.
+  const [enfants, fraternites, presencesAnnee, cotisationsAnnee] = await Promise.all([
+    prisma.enfant.findMany({
+      where: enfantScope,
+      include: { fraternite: true },
+      orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
+    }),
+    prisma.fraternite.findMany({
+      where: { groupeId },
+      orderBy: { nom: "asc" },
+    }),
+    prisma.presence.findMany({
+      where: { groupeId, enfant: enfantScope, date: { in: datesAnnee } },
+    }),
+    prisma.cotisation.findMany({
+      where: { groupeId, enfant: enfantScope, date: { in: datesAnnee } },
+    }),
+  ]);
 
-  const presences = await prisma.presence.findMany({
-    where: { groupeId, enfantId: { in: enfantIds }, date: { in: dateObjs } },
-  });
-  const cotisations = await prisma.cotisation.findMany({
-    where: { groupeId, enfantId: { in: enfantIds }, date: { in: dateObjs } },
-  });
+  const datesSelectionnees = new Set(dimanches.map((d) => d.toISOString().slice(0, 10)));
+  const presences = presencesAnnee.filter((p) =>
+    datesSelectionnees.has(p.date.toISOString().slice(0, 10)),
+  );
+  const cotisations = cotisationsAnnee.filter((c) =>
+    datesSelectionnees.has(c.date.toISOString().slice(0, 10)),
+  );
 
   // Map: enfantId -> dateISO -> etat/montant
   const presenceMap: Record<string, Record<string, string>> = {};
@@ -61,19 +90,6 @@ export async function getConsultationData(groupeId: string, filters: Consultatio
     if (!cotisationMap[c.enfantId]) cotisationMap[c.enfantId] = {};
     cotisationMap[c.enfantId][iso] = c.montant;
   }
-
-  // Bilan annuel par enfant (tous les dimanches de l'année)
-  const dimanchesAnnee = allDimanches.filter((d) => {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Porto-Novo", year: "numeric" }).formatToParts(d);
-    return parseInt(parts.find((p) => p.type === "year")!.value, 10) === filters.annee;
-  });
-  const datesAnnee = dimanchesAnnee.map((d) => new Date(d.toISOString().slice(0, 10) + "T00:00:00Z"));
-  const presencesAnnee = await prisma.presence.findMany({
-    where: { groupeId, enfantId: { in: enfantIds }, date: { in: datesAnnee } },
-  });
-  const cotisationsAnnee = await prisma.cotisation.findMany({
-    where: { groupeId, enfantId: { in: enfantIds }, date: { in: datesAnnee } },
-  });
 
   const bilan: Record<string, { present: number; permission: number; absent: number; taux: number; cotisationTotal: number }> = {};
   for (const e of enfants) {
@@ -126,11 +142,6 @@ export async function getConsultationData(groupeId: string, filters: Consultatio
     const m = parseInt(parts.find((p) => p.type === "month")!.value, 10);
     cotisationParMois[m] = (cotisationParMois[m] ?? 0) + c.montant;
   }
-
-  const fraternites = await prisma.fraternite.findMany({
-    where: { groupeId },
-    orderBy: { nom: "asc" },
-  });
 
   return {
     groupe,

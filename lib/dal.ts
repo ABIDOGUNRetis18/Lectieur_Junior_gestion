@@ -37,33 +37,32 @@ export async function getFraterniteById(id: string) {
   return prisma.fraternite.findFirst({ where: { id, groupeId } });
 }
 
-/** Statistiques d'une fraternité : nb de présences « présent » + total des cotisations. */
+/**
+ * Statistiques d'une fraternité : nb de présences « présent » + total des cotisations.
+ *
+ * Les trois agrégats sont lancés en parallèle et filtrent directement via la
+ * relation `enfant` : plus besoin de charger la liste des identifiants
+ * (un aller-retour DB en moins, et plus de requête séquentielle).
+ */
 export async function getStatsFraternite(fraterniteId: string) {
   const groupeId = await requireGroup();
-  const enfants = await prisma.enfant.findMany({
-    where: { groupeId, fraterniteId, statut: "ACTIF" },
-    select: { id: true },
-  });
-  const enfantIds = enfants.map((e) => e.id);
+  const enfantActif = { fraterniteId, statut: "ACTIF" as const, groupeId };
 
-  if (enfantIds.length === 0) {
-    return { presencesPresentes: 0, totalCotisations: 0, enfantsCount: 0 };
-  }
-
-  const [presencesPresentes, totalCotisations] = await Promise.all([
+  const [presencesPresentes, totalCotisations, enfantsCount] = await Promise.all([
     prisma.presence.count({
-      where: { groupeId, enfantId: { in: enfantIds }, etat: "PRESENT" },
+      where: { groupeId, etat: "PRESENT", enfant: enfantActif },
     }),
     prisma.cotisation.aggregate({
-      where: { groupeId, enfantId: { in: enfantIds } },
+      where: { groupeId, enfant: enfantActif },
       _sum: { montant: true },
     }),
+    prisma.enfant.count({ where: enfantActif }),
   ]);
 
   return {
     presencesPresentes,
     totalCotisations: totalCotisations._sum.montant ?? 0,
-    enfantsCount: enfants.length,
+    enfantsCount,
   };
 }
 

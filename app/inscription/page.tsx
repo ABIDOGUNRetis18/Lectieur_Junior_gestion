@@ -15,7 +15,7 @@ export default async function InscriptionPage() {
       : fraternites;
 
   return (
-    <AppShell title="Inscription">
+    <AppShell title="Inscription" role={session.user.role} userName={session.user.name}>
       <InscriptionView fraternites={visible} />
     </AppShell>
   );

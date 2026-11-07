@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { tracerDeconnexionAction } from "@/lib/actions/session";
@@ -47,14 +47,17 @@ const NAV_ADMIN = [
 
 export default function AppShell({
   title,
+  role: userRole,
+  userName,
   children,
 }: {
   title: string;
+  role: string;
+  userName?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const role = session?.user?.role ?? "";
+  const role = userRole;
   const roleLabel = ROLE_LABEL[role] ?? role;
   const isAdmin = role === "ADMIN";
   const nav = isAdmin ? NAV_ADMIN : NAV_BASE;
@@ -102,7 +105,7 @@ export default function AppShell({
               <span className="material-symbols-outlined text-on-primary text-[20px]">person</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-body-md text-on-surface truncate">{session?.user?.name}</div>
+              <div className="font-body-md text-on-surface truncate">{userName}</div>
               <div className="text-sm text-on-surface-variant">{roleLabel}</div>
             </div>
           </div>

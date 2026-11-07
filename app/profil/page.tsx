@@ -16,7 +16,7 @@ export default async function ProfilPage() {
   if (!user) redirect("/connexion");
 
   return (
-    <AppShell title="Profil">
+    <AppShell title="Profil" role={session.user.role} userName={session.user.name}>
       <div className="px-margin py-space-md">
         <ProfilForm
           user={{

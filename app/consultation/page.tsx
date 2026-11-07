@@ -26,7 +26,7 @@ export default async function ConsultationPage({
     ? session.user.fraterniteId
     : params.fraternite || null;
 
-  const data = await getConsultationData(groupe!.id, { annee, mois, fraterniteId });
+  const data = await getConsultationData(groupe!, { annee, mois, fraterniteId });
 
   if (estResponsable) {
     // Pas de liste déroulante des autres fraternités pour un responsable
@@ -34,7 +34,7 @@ export default async function ConsultationPage({
   }
 
   return (
-    <AppShell title="Consultation">
+    <AppShell title="Consultation" role={session.user.role} userName={session.user.name}>
       <ConsultationView data={data} />
     </AppShell>
   );

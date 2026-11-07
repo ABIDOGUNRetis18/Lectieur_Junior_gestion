@@ -11,15 +11,18 @@ export default async function ResponsableTableauDeBordPage() {
   const session = await requireRole("RESPONSABLE");
   const fraterniteId = session.user.fraterniteId;
 
-  const fraternites = await getFraternites();
-  const enfants = fraterniteId ? await getEnfants(fraterniteId) : [];
-  const stats = fraterniteId ? await getStatsFraternite(fraterniteId) : null;
+  // Les trois lectures sont indépendantes : on les lance en parallèle.
+  const [fraternites, enfants, stats] = await Promise.all([
+    getFraternites(),
+    fraterniteId ? getEnfants(fraterniteId) : Promise.resolve([]),
+    fraterniteId ? getStatsFraternite(fraterniteId) : Promise.resolve(null),
+  ]);
   const fraterniteNom = fraternites.find((f) => f.id === fraterniteId)?.nom ?? "Ma fraternité";
   // Un responsable ne voit que SA fraternité : inutile de proposer les autres en filtre
   const fraternitesVisibles = fraternites.filter((f) => f.id === fraterniteId);
 
   return (
-    <AppShell title="Tableau de bord">
+    <AppShell title="Tableau de bord" role={session.user.role} userName={session.user.name}>
       <div className="px-margin py-space-md space-y-space-md">
         {stats && (
           <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-xs">

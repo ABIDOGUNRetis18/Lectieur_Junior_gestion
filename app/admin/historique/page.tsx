@@ -14,7 +14,7 @@ export default async function HistoriquePage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireRole("ADMIN");
+  const session = await requireRole("ADMIN");
   const groupe = await getGroupeCourant();
   if (!groupe) redirect("/admin/tableau-de-bord");
 
@@ -23,32 +23,33 @@ export default async function HistoriquePage({
   const recherche = params.q?.trim() || "";
 
   // Filtres côté serveur : type d'action + recherche texte (utilisateur ou détails)
-  const historique = await prisma.historique.findMany({
-    where: {
-      groupeId: groupe.id,
-      ...(filtreAction ? { action: filtreAction } : {}),
-      ...(recherche
-        ? {
-            OR: [
-              { details: { contains: recherche, mode: "insensitive" } },
-              { utilisateur: { nom: { contains: recherche, mode: "insensitive" } } },
-              { utilisateur: { email: { contains: recherche, mode: "insensitive" } } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: { utilisateur: true },
-    take: 200,
-  });
-
-  // Actions réellement présentes dans le groupe (pour le menu déroulant)
-  const actionsExistantes = await prisma.historique.groupBy({
-    by: ["action"],
-    where: { groupeId: groupe.id },
-    _count: { _all: true },
-    orderBy: { action: "asc" },
-  });
+  const [historique, actionsExistantes] = await Promise.all([
+    prisma.historique.findMany({
+      where: {
+        groupeId: groupe.id,
+        ...(filtreAction ? { action: filtreAction } : {}),
+        ...(recherche
+          ? {
+              OR: [
+                { details: { contains: recherche, mode: "insensitive" } },
+                { utilisateur: { nom: { contains: recherche, mode: "insensitive" } } },
+                { utilisateur: { email: { contains: recherche, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: { utilisateur: true },
+      take: 200,
+    }),
+    // Actions réellement présentes dans le groupe (pour le menu déroulant)
+    prisma.historique.groupBy({
+      by: ["action"],
+      where: { groupeId: groupe.id },
+      _count: { _all: true },
+      orderBy: { action: "asc" },
+    }),
+  ]);
 
   const query = (action: string, q: string) => {
     const sp = new URLSearchParams();
@@ -59,7 +60,7 @@ export default async function HistoriquePage({
   };
 
   return (
-    <AppShell title="Historique">
+    <AppShell title="Historique" role={session.user.role} userName={session.user.name}>
       <div className="px-margin py-space-md space-y-space-md">
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-xs">
           <h2 className="font-headline-sm text-headline-sm text-primary">

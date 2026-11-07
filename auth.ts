@@ -16,6 +16,8 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
+const SESSION_REVALIDATE_MS = 60 * 1000; // 1 min
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 8 * 60 * 60 }, // 8h
   pages: { signIn: "/connexion" },
@@ -126,9 +128,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.groupeId = (user as { groupeId?: string }).groupeId;
         token.fraterniteId = (user as { fraterniteId?: string | null }).fraterniteId;
         token.issuedAt = Date.now();
+        token.refreshedAt = Date.now();
+        token.revocationCheckedAt = Date.now();
       }
-      // Rafraîchir les données utilisateur depuis la base (groupe/fraternité peuvent changer)
-      if (token.email) {
+
+      if (!token.issuedAt) {
+        token.issuedAt = Date.now();
+      }
+
+      // Révocation : vérifiée au plus une fois par minute et par token.
+      // `getRevokedEpoch` garde en plus un cache mémoire de 10 s partagé entre
+      // les sessions, ce qui évite une requête DB à chaque navigation.
+      if (token.groupeId) {
+        const lastCheck = (token.revocationCheckedAt as number) ?? 0;
+        if (Date.now() - lastCheck > SESSION_REVALIDATE_MS) {
+          const revokedAt = await getRevokedEpoch(token.groupeId as string);
+          if (revokedAt && revokedAt > (token.issuedAt as number)) {
+            return null; // Session invalidée
+          }
+          token.revocationCheckedAt = Date.now();
+        }
+      }
+
+      // Rafraîchir les données utilisateur (rôle, groupe, fraternité) au plus
+      // une fois par minute. Auparavant, un `findUnique` était exécuté à CHAQUE
+      // lecture de session (proxy + page + /api/auth/session), soit plusieurs
+      // aller-retours DB par clic.
+      const lastRefresh = (token.refreshedAt as number) ?? 0;
+      if (token.email && Date.now() - lastRefresh > SESSION_REVALIDATE_MS) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email as string },
           select: { id: true, groupeId: true, fraterniteId: true, role: true },
@@ -141,20 +168,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.groupeId = dbUser.groupeId;
         token.fraterniteId = dbUser.fraterniteId;
         token.role = dbUser.role;
-
-        // Si issuedAt n'est pas défini (anciens tokens), l'initialiser
-        if (!token.issuedAt) {
-          token.issuedAt = Date.now();
-        }
-
-        // Vérifier si les sessions ont été révoquées
-        if (token.groupeId) {
-          const revokedAt = await getRevokedEpoch(token.groupeId as string);
-          if (revokedAt && revokedAt > (token.issuedAt as number)) {
-            return null; // Session invalidée
-          }
-        }
+        token.refreshedAt = Date.now();
       }
+
       return token;
     },
     async session({ session, token }) {

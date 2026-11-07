@@ -126,7 +126,34 @@
 
 ---
 
-## Journal des_implémentations
+## P3 — Performance (sans affaiblir la sécurité)
+
+### 4.1 Session & proxy
+- [x] Callback `jwt` : lecture utilisateur + vérification de révocation limitées à **1×/min par token** (`SESSION_REVALIDATE_MS`) au lieu d'un `findUnique` + `getRevokedEpoch` à chaque lecture de session (proxy + page + `/api/auth/session`)
+- [x] Fenêtre de revalidation assumée et documentée : un changement de rôle/fraternité ou une révocation globale peut mettre **jusqu'à 60 s** à s'appliquer sur un token déjà émis. `getRevokedEpoch` conserve son cache mémoire de 10 s, invalidé immédiatement après une révocation sur la même instance. Compromis requis pour éviter plusieurs requêtes DB par clic.
+- [x] Suppression du `SessionProvider` client : `role` et `userName` sont passés en props à `AppShell` depuis la session serveur → plus de `GET /api/auth/session` au chargement et plus de « flash » du menu
+- Preuve : `/api/auth/session` ~250 ms → **13-20 ms** avec cookie persisté
+
+### 4.2 Requêtes base de données
+- [x] Tableau de bord admin : `getFraternitesAvecCount()` + `getEnfants()` en `Promise.all`, suppression de `getFraternites()` redondant
+- [x] Tableau de bord responsable : fraternités + enfants + statistiques en `Promise.all`
+- [x] `getStatsFraternite` : 3 agrégats en parallèle via filtre relationnel `enfant`, plus de `findMany` préalable (1 aller-retour supprimé)
+- [x] Présence et cotisation : une seule requête `getEnfantsActifs()` + regroupement en mémoire (suppression du N+1 d'une requête par fraternité)
+- [x] Consultation : 4 requêtes en parallèle et réutilisation des présences/cotisations annuelles pour les dimanches filtrés (6 → 4 requêtes)
+- [x] Administration, paramètres, historique et fiche enfant : lectures indépendantes parallélisées
+- Preuve : dashboard admin **~1,0-1,2 s → ~0,30-0,45 s** à chaud ; présence **~0,27 s** ; cotisation **~0,26 s** ; consultation **~0,65 s → ~0,40 s** ; `/profil` **~0,7 s → ~0,30 s** (Neon `eu-central-1`, mesures `next start`)
+
+### 4.3 Navigation perçue
+- [x] `loading.tsx` sur chaque segment authentifié (`admin`, `responsable`, présence, cotisation, consultation, inscription, import, profil, fiche enfant) + squelette partagé `components/AppLoading.tsx` qui reprend la structure de `AppShell` : fallback immédiat sans faire disparaître la navigation. Les pages publiques (`/connexion`, `/rejoindre`…) n'affichent pas de squelette de tableau de bord.
+- Preuve : `time_starttransfer` des pages authentifiées **~130-200 ms → ~5-10 ms**
+- Note : `export const instant = false` ne bloque pas le rendu ; c'est uniquement un opt-out de la validation « instant navigation » de Cache Components. Conservé sur les pages dynamiques.
+
+### 4.4 Infra
+- [x] `vercel.json` : `regions: ["fra1"]` pour exécuter les fonctions à Francfort, au plus près de Neon `eu-central-1` (le défaut Vercel `iad1` ajoutait ~80-100 ms par requête DB)
+- Note : le premier appel après démarrage à froid reste plus lent (~1,5 s) : ouverture TCP/TLS vers Neon + compilation du pool. C'est inévitable sans service de connexion externe ; les appels suivants sont à chaud.
+
+---
+
 
 | Date | Item | Commande / preuve | Note |
 |---|---|---|---|
@@ -144,6 +171,7 @@
 | 2026-11-06 | 3.3 Infra Vercel | `next.config.ts` (CSP report-only), `app/api/csp-report/route.ts`, `docs/VERCEL-SECURITY.md`, `curl -I` + POST report OK, build OK | WAF/BotID/allowlist en dashboard ; CSP enforce après 2 sem. de monitoring (zod eval vu en report-only) |
 | 2026-11-07 | Vérification complète roadmap | Audit fichier par fichier + `tsc`/`lint`/`npm audit critical`/`next build` OK ; CI GitHub verte sur `cd919b9` (`check`, `Secrets`, `Analyze (actions)`, `Analyze (javascript-typescript)`) ; headers vérifiés via `next start` | Corrections : cookie OTP préfixé `__Secure-` en prod ; actions CI `checkout@v6`/`setup-node@v6`/`gitleaks@v3`/ZAP `v0.15.0` (runtime Node 24) ; roadmap alignée sur le Default setup CodeQL |
 | 2026-11-07 | 1.3 Anti-énumération connexion/OTP | `auth.ts` (`DUMMY_HASH` bcrypt valide), `mot-de-passe.ts` (cookie-leurre), `rejoindre.ts` (`compteExistant` révélé après OTP), `profil.ts` (OTP + rate limit + 5 essais), `app/connexion/page.tsx` (`sanitizeCallbackUrl`), toasts génériques, `app/error.tsx`/`app/global-error.tsx`, `crypto.randomInt` ; `tsc`/`lint`/`next build` OK | Aucun message ne distingue compte existant / inexistant avant preuve de possession de la boîte ; sanitisation testée sur `//evil.com`, `https://evil.com`, `/\evil.com`, `javascript:` |
+| 2026-11-07 | Performance perçue (P3) | `auth.ts` (revalidation 1×/min), `loading.tsx` par segment + `components/AppLoading.tsx`, `vercel.json` (`fra1`), `AppShell`/`Providers` (session serveur, sans `SessionProvider`), `lib/dal.ts` (`getStatsFraternite`), dashboards/présence/cotisation/consultation/historique en `Promise.all` ; `tsc`/`lint`/`next build` OK ; mesures `next start` : dashboard ~1,0-1,2 s → ~0,3-0,45 s, `/api/auth/session` ~250 ms → ~15 ms, `starttransfer` ~130 ms → ~5-10 ms | Fenêtre de revalidation de session 60 s documentée ; premier appel à froid toujours ~1,5 s (connexion Neon) |
 | | | | |
 
 ---

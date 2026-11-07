@@ -17,7 +17,10 @@ export default async function EnfantPage({
   const session = await requireRole("ADMIN", "RESPONSABLE");
   const { id } = await params;
 
-  const enfant = await getEnfantWithDetails(id);
+  const [enfant, fraternites] = await Promise.all([
+    getEnfantWithDetails(id),
+    getFraternites(),
+  ]);
   if (!enfant) notFound();
 
   // Un responsable ne peut consulter que les enfants de sa fraternité.
@@ -28,7 +31,6 @@ export default async function EnfantPage({
     redirect("/responsable/tableau-de-bord");
   }
 
-  const fraternites = await getFraternites();
   const visibles =
     session.user.role === "RESPONSABLE" && session.user.fraterniteId
       ? fraternites.filter((f) => f.id === session.user.fraterniteId)
@@ -37,7 +39,7 @@ export default async function EnfantPage({
   const dashboardHref = session.user.role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
 
   return (
-    <AppShell title="Fiche enfant">
+    <AppShell title="Fiche enfant" role={session.user.role} userName={session.user.name}>
       <div className="px-margin pt-space-md">
         <Link
           href={dashboardHref}
@@ -73,6 +75,7 @@ export default async function EnfantPage({
           })),
         }}
         fraternites={visibles.map((f) => ({ id: f.id, nom: f.nom }))}
+        role={session.user.role}
       />
     </AppShell>
   );

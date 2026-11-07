@@ -14,7 +14,7 @@ export default async function ImportPage() {
       : fraternites;
 
   return (
-    <AppShell title="Import CSV">
+    <AppShell title="Import CSV" role={session.user.role} userName={session.user.name}>
       <ImportForm fraternites={visible} />
     </AppShell>
   );

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-helpers";
-import { getFraternites, getFraternitesAvecCount, getEnfants } from "@/lib/dal";
+import { getFraternitesAvecCount, getEnfants } from "@/lib/dal";
 
 import AppShell from "@/components/AppShell";
 import ChildrenTable from "@/components/ChildrenTable";
@@ -24,13 +24,18 @@ function getFraternityColor(index: number) {
 }
 
 export default async function AdminTableauDeBordPage() {
-  await requireRole("ADMIN");
-  const fraternitesAvecCount = await getFraternitesAvecCount();
-  const fraternites = await getFraternites();
-  const enfants = await getEnfants();
+  const session = await requireRole("ADMIN");
+  // Requêtes indépendantes → exécutées en parallèle au lieu de trois
+  // allers-retours séquentiels. `getFraternitesAvecCount` contient déjà
+  // id + nom : plus besoin de getFraternites().
+  const [fraternitesAvecCount, enfants] = await Promise.all([
+    getFraternitesAvecCount(),
+    getEnfants(),
+  ]);
+  const fraternites = fraternitesAvecCount.map((f) => ({ id: f.id, nom: f.nom }));
 
   return (
-    <AppShell title="Tableau de bord">
+    <AppShell title="Tableau de bord" role={session.user.role} userName={session.user.name}>
       <div className="px-margin py-space-md space-y-space-md">
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-xs">
           <h2 className="font-headline-sm text-headline-sm text-primary">Fraternités du groupe</h2>

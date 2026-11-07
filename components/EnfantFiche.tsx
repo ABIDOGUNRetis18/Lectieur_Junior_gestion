@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import {
   changerStatutEnfantAction,
   supprimerEnfantAction,
@@ -30,7 +29,7 @@ type Enfant = {
   fraterniteNom: string; createdAt: string; updatedAt: string;
   presences: Pres[]; cotisations: Cot[];
 };
-type Props = { enfant: Enfant; fraternites: Frat[] };
+type Props = { enfant: Enfant; fraternites: Frat[]; role: string };
 
 const CAT_LABEL: Record<string, string> = {
   ANNEE_1: "1ère année", ANNEE_2: "2ème année", ANNEE_3: "3ème année",
@@ -39,11 +38,10 @@ const CAT_LABEL: Record<string, string> = {
 
 const FIELD = "w-full h-[44px] rounded-lg bg-surface-container-lowest text-on-surface font-body-md border border-outline-variant px-space-sm";
 
-export default function EnfantFiche({ enfant, fraternites }: Props) {
+export default function EnfantFiche({ enfant, fraternites, role }: Props) {
   const router = useRouter();
-  const { data: session } = useSession();
   const dashboardHref =
-    session?.user?.role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
+    role === "ADMIN" ? "/admin/tableau-de-bord" : "/responsable/tableau-de-bord";
   const storedSerie = enfant.serie ?? "";
   const initialSerie = storedSerie.startsWith("Autre: ") ? "AUTRE" : storedSerie;
   const initialSerieAutre = storedSerie.startsWith("Autre: ") ? storedSerie.slice(7) : "";

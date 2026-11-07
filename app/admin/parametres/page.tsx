@@ -7,14 +7,16 @@ import ParametresView from "@/components/ParametresView";
 
 export default async function ParametresPage() {
   const session = await requireRole("ADMIN");
-  const groupe = await getGroupeCourant();
-  const fraternites = await getFraternites();
-  const utilisateurs = await getUtilisateurs();
+  const [groupe, fraternites, utilisateurs] = await Promise.all([
+    getGroupeCourant(),
+    getFraternites(),
+    getUtilisateurs(),
+  ]);
 
   if (!groupe) return null;
 
   return (
-    <AppShell title="Paramètres">
+    <AppShell title="Paramètres" role={session.user.role} userName={session.user.name}>
       <ParametresView
         groupe={{
           nom: groupe.nom,

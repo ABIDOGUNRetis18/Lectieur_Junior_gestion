@@ -7,11 +7,13 @@ export const instant = false;
 
 export default async function AdministrationPage() {
   const session = await requireRole("ADMIN");
-  const utilisateurs = await getUtilisateurs();
-  const fraternites = await getFraternites();
+  const [utilisateurs, fraternites] = await Promise.all([
+    getUtilisateurs(),
+    getFraternites(),
+  ]);
 
   return (
-    <AppShell title="Administration">
+    <AppShell title="Administration" role={session.user.role} userName={session.user.name}>
       <AdministrationView
         allComptes={utilisateurs.map((u) => ({
           id: u.id,
