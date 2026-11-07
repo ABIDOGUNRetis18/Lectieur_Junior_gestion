@@ -67,6 +67,7 @@
 ### 2.2 Politique mot de passe
 - [x] 12 car. min (zod + `minLength` client partout), variété 3/4 classes, mots courants, anti-e-mail/nom, anti-répétition (`lib/password.ts`, serveur partout : inscription, création compte, reset admin, mot de passe oublié, profil)
 - Note : historique des 3 derniers **non implémenté** — impossible sans migration (`PasswordHistory` requise, `schema.prisma` intouchable). Garde-fou actuel : `bcrypt.compare` contre l'actuel uniquement.
+- [~] Historique des 3 derniers mots de passe — **reporté/bloqué** (migration interdite) ; à reprendre si le schéma peut évoluer
 - [x] Comptes dormants : blocage `authorize` après 90 j sans activité (`max(updatedAt, dernière CONNEXION)`), log `CONNEXION_ECHOUEE`, reset admin rouvre (via `updatedAt`)
 - [ ] 2FA : OTP à chaque connexion admin (step-up) — différé, l'OTP e-mail inscription/reset couvre déjà le risque
 - Preuve : test navigateur inscription `aaaaaaaaaaaa` rejeté (« Utilisez au moins 3 types… ») ; `tsc`/`lint`/`next build` OK
@@ -88,7 +89,7 @@
 
 ### 2.5 Upload / exports
 - [x] Import CSV : limite serveur 5 Mo + 2000 lignes, Excel 2000 lignes max, texte seul (jamais d'exécution) — client déjà 5 Mo
-- [x] Scan antivirus : **reporté** — pas de nouveau service externe (règle « pas de dépendances ») ; mitigation : parsing texte seul + limites de taille + zod strict par cellule
+- [~] Scan antivirus : **non implémenté / reporté** — pas de nouveau service externe (règle « pas de dépendances ») ; mitigation : parsing texte seul + limites de taille + zod strict par cellule
 - [x] Exports Excel/PDF : filigrane (feuille `Info` Excel, en-tête + pied de page PDF : « Confidentiel — Exporté le … »), déjà journalisés
 - Pagination : `historique` déjà limité à 200 avec filtres, `consultation` filtre par année (bornée) — aucun `take: 1000` de lignes métier
 - Preuve : `tsc`/`lint`/`next build` OK, dev server OK
@@ -98,23 +99,23 @@
 ## P2 — Durcissement
 
 ### 3.1 SAST / DAST / SCA en CI
-- [x] SAST : CodeQL (`security-extended`, JS/TS) en job `sast` sur chaque PR/push
+- [x] SAST : **CodeQL via le Default setup GitHub** (workflow dynamique `CodeQL`, check-runs `Analyze (javascript-typescript)` + `Analyze (actions)`) — le job custom `sast` a été retiré de `ci.yml` (conflit SARIF « advanced vs default »)
 - [x] SCA : Dependabot hebdo (`.github/dependabot.yml`, max 10 PR) + `npm audit` déjà en CI
-- [x] Secrets : Gitleaks en job `secrets` (historique complet `fetch-depth: 0`)
-- [x] DAST : ZAP baseline hebdo (`zap.yml`, lundi 03:00 UTC, `fail_action: true`, OWASP Top 10) — sur le build CI (PAS sur prod, pour ne pas scanner les vraies données)
+- [x] Secrets : Gitleaks `@v3` en job `secrets` (historique complet `fetch-depth: 0`)
+- [x] DAST : ZAP baseline hebdo (`zap.yml`, `zaproxy/action-baseline@v0.15.0`, lundi 03:00 UTC, `fail_action: true`, OWASP Top 10) — sur le build CI (PAS sur prod, pour ne pas scanner les vraies données)
 - [x] Règle : `export const dynamic = force-dynamic` interdit par grep bloquant en CI (NONE aujourd'hui)
-- Preuve : YAML valide (`python yaml`), `tsc`/`lint`/`next build` OK, build CI avec env factice
+- Preuve : CodeQL #1/#2 verts (checks `Analyze (actions)` et `Analyze (javascript-typescript)`), YAML valide (`python yaml`), CI verte sur `cd919b9`, `tsc`/`lint`/`next build` OK
 
 ### 3.2 CI/CD
-- [x] Fichier `CODEOWNERS` (auth, otp, mot-de-passe, proxy, session-revoke, rate-limit, password, next.config, .github) + doc GitHub protection de branche (`docs/CI-CD.md`)
-- [x] Checks obligatoires documentés (`check`, `SAST (CodeQL)`, `Secrets (Gitleaks)`) — à cocher dans Settings → Branches
+- [x] Fichier `CODEOWNERS` (auth, otp, mot-de-passe, proxy, session-revoke, rate-limit, password, next.config, .github) + doc protection de branche (`docs/CI-CD.md`)
+- [x] Checks obligatoires documentés (`check`, `Secrets (Gitleaks)`, `Analyze (javascript-typescript)` — noms réels des check-runs) — à cocher dans Settings → Rulesets (ou Branches)
 - [x] Previews protégées documentées (Vercel Authentication, Production publique) + environnements dev/prod séparés (Neon dev vs prod, AUTH_SECRET distincts)
-- Preuve : `CODEOWNERS` + `docs/CI-CD.md` committés, jobs CI vérifiés (YAML OK), `tsc`/`lint`/`next build` OK
+- Preuve : `CODEOWNERS` + `docs/CI-CD.md` committés, checks réels relevés via l'API GitHub (`check`, `Secrets (Gitleaks)`, `Analyze (actions)`, `Analyze (javascript-typescript)`), CI verte sur `cd919b9`
 
 ### 3.3 Infra Vercel
-- [x] `Content-Security-Policy-Report-Only` stricte (sans `unsafe-*`, `report-uri /api/csp-report`) — testé `curl -I`, violations `csp_violation` loggées en JSON
+- [x] `Content-Security-Policy-Report-Only` stricte (sans `unsafe-*`, `report-uri /api/csp-report`) — **envoyée uniquement en production** (`NODE_ENV=production`, pour éviter le bruit dev Turbopack/zod) ; testée via `next start` + `curl -I`, violations `csp_violation` loggées en JSON
 - [~] WAF Vercel + BotID + IP allowlist documentés (`docs/VERCEL-SECURITY.md`) — actions dashboard manuelles (Managed Rules, Bot Protection sur `/connexion`/`/rejoindre`/`/mot-de-passe-oublie`, allowlist `/admin/*` optionnelle)
-- Preuve : `curl -I` montre les 2 CSP, `POST /api/csp-report` → `{"ok":true}` + ligne `csp_violation` en JSON, `tsc`/`lint`/`next build` OK
+- Preuve : `curl -I` (serveur `next start`, prod) montre les 2 CSP, `POST /api/csp-report` → `{"ok":true}` + ligne `csp_violation` en JSON, `tsc`/`lint`/`next build` OK
 
 ---
 
@@ -134,6 +135,7 @@
 | 2026-11-06 | 3.1 SAST / DAST / SCA | `.github/workflows/ci.yml` (CodeQL + Gitleaks + force-dynamic guard), `zap.yml` (hebdo), `dependabot.yml`, YAML OK, build OK | ZAP sur build CI (PAS sur prod) |
 | 2026-11-06 | 3.2 CI/CD | `.github/CODEOWNERS`, `docs/CI-CD.md`, jobs CI vérifiés, build OK | Actions dashboard manuelles (GitHub/Vercel) documentées |
 | 2026-11-06 | 3.3 Infra Vercel | `next.config.ts` (CSP report-only), `app/api/csp-report/route.ts`, `docs/VERCEL-SECURITY.md`, `curl -I` + POST report OK, build OK | WAF/BotID/allowlist en dashboard ; CSP enforce après 2 sem. de monitoring (zod eval vu en report-only) |
+| 2026-11-07 | Vérification complète roadmap | Audit fichier par fichier + `tsc`/`lint`/`npm audit critical`/`next build` OK ; CI GitHub verte sur `cd919b9` (`check`, `Secrets`, `Analyze (actions)`, `Analyze (javascript-typescript)`) ; headers vérifiés via `next start` | Corrections : cookie OTP préfixé `__Secure-` en prod ; actions CI `checkout@v6`/`setup-node@v6`/`gitleaks@v3`/ZAP `v0.15.0` (runtime Node 24) ; roadmap alignée sur le Default setup CodeQL |
 | | | | |
 
 ---

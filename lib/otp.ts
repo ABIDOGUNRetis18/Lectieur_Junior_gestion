@@ -8,7 +8,10 @@ import { promisify } from "util";
 import { cookies, headers } from "next/headers";
 import { logger } from "@/lib/logger";
 
-const COOKIE_NAME = "otp_pending";
+// Préfixe __Secure- en production (cookie refusé si posé sans Secure / hors HTTPS).
+const COOKIE_NAME = `${
+  process.env.NODE_ENV === "production" ? "__Secure-" : ""
+}otp_pending`;
 const TTL_SECONDS = 10 * 60; // 10 minutes
 
 function getKey(): Buffer {

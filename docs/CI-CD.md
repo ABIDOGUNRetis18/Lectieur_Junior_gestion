@@ -2,7 +2,7 @@
 
 ## GitHub — protection de branche `main`
 
-Settings → Branches → Add rule (`main`) :
+Settings → Rulesets → **New branch ruleset** (recommandé) ou Settings → Branches → Add rule (`main`) :
 - [x] Require a pull request before merging
   - Required approvals : **1** (CODEOWNERS compte)
   - Require review from Code Owners : **oui**
@@ -12,12 +12,17 @@ Settings → Branches → Add rule (`main`) :
 - [x] Block force pushes
 - [x] Restrict deletions
 
-### Required status checks (Settings → Branches)
-- `check` (CI : `tsc`, `lint`, guards, `audit critical`, `next build`)
-- `SAST (CodeQL)`
+### Required status checks (noms réels des check-runs)
+- `check` (CI : `prisma generate`, `tsc`, `lint`, guards, `audit critical`, `next build`)
 - `Secrets (Gitleaks)`
+- `Analyze (javascript-typescript)` (CodeQL — Default setup)
+- `Analyze (actions)` (CodeQL — Default setup)
 
-Le build doit passer sur les 3 avant merge. ZAP (`zap.yml`) est planifié, non bloquant.
+> Le SAST n'est **plus** un job de `ci.yml` : il est fourni par le **Default setup** GitHub
+> (workflow dynamique « CodeQL »). Un job `init/analyze` custom entrerait en conflit
+> (« advanced vs default ») et ferait échouer l'upload SARIF.
+
+Le build doit passer sur ces checks avant merge. ZAP (`zap.yml`) est planifié, non bloquant.
 
 ## Vercel — previews protégées
 
