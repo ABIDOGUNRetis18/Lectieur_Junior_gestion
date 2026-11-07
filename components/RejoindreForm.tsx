@@ -70,8 +70,8 @@ export default function RejoindreForm({ fraternites }: { fraternites: Frat[] }) 
       } else {
         toastError(res.error ?? "Erreur.");
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur inconnue.";
+    } catch {
+      const msg = "Une erreur est survenue. Réessayez dans un instant.";
       setFormResult({ ok: false, error: msg });
       toastError(msg);
     } finally {
@@ -92,8 +92,8 @@ export default function RejoindreForm({ fraternites }: { fraternites: Frat[] }) 
       } else {
         toastError(res.error ?? "Code incorrect.");
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur inconnue.";
+    } catch {
+      const msg = "Une erreur est survenue. Réessayez dans un instant.";
       setOtpResult({ ok: false, error: msg });
       toastError(msg);
     } finally {

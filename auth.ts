@@ -6,8 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { getRevokedEpoch } from "@/lib/session-revoke";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-// Hash factice pour délai constant si l'utilisateur n'existe pas (item 1.3)
-const DUMMY_HASH = "$2b$12$invalidhashinvalidhashinvalidhashinvalidha";
+// Hash factice (VALIDE, 60 caractères, coût 12) pour délai constant si l'utilisateur
+// n'existe pas (item 1.3). Doit être un vrai hash bcrypt : un hash malformé ferait
+// échouer `compare` en < 1 ms et recréerait une fuite par timing.
+const DUMMY_HASH = "$2b$12$RoOgJ0Wq2.YJ3vj8.koaAurU3eskzeurzzWBs1leRb.oJl0ma6Pue";
 
 const credentialsSchema = z.object({
   email: z.string().email(),

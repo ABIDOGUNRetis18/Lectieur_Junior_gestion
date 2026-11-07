@@ -38,8 +38,15 @@
 - Note : compte en mémoire par instance (Vercel multi-instance non partagé) — migration Upstash Redis en P2
 
 ### 1.3 Délai constant + anti-énumération
-- [x] `authorize` : `bcrypt.compare` factice si user inexistant (délai constant, `DUMMY_HASH` dans `auth.ts`)
-- Preuve : même chemin bcrypt pour e-mail inexistant et mot de passe faux ; `tsc`/`lint`/`build` OK
+- [x] `authorize` : `bcrypt.compare` factice si user inexistant (délai constant). `DUMMY_HASH` est un **vrai** hash bcrypt 60 car. coût 12 (un hash malformé échouait en < 1 ms et recréait la fuite par timing)
+- [x] Message de connexion unique : « E-mail ou mot de passe incorrect… » — aucun détail sur l'e-mail, le mot de passe, un compte dormant ou bloqué (`app/connexion/page.tsx`, `auth.ts`)
+- [x] Mot de passe oublié : réponse générique « Si un compte existe… » + cookie-leurre chiffré pour les e-mails inconnus (l'étape 2 se comporte exactement comme un compte réel) ; renvoi limité à 3 / 15 min
+- [x] Inscription publique : l'existence d'un compte n'est révélée qu'**après** validation du code OTP (preuve de possession de la boîte) ; renvoi limité à 3 / 15 min
+- [x] Changement d'e-mail (profil) : même logique (existence révélée après OTP), 3 demandes + 3 renvois / 15 min, max 5 essais de code
+- [x] Aucun message technique affiché : toasts/formulaires génériques (`MotDePasseOublieForm`, `RejoindreForm`), `app/error.tsx` + `app/global-error.tsx` génériques (jamais `error.message`)
+- [x] Open redirect `callbackUrl` corrigé : seuls les chemins internes commençant par `/` sont acceptés (refus de `//`, `\`, URL absolues et caractères de contrôle)
+- [x] OTP généré par CSPRNG (`crypto.randomInt`) au lieu de `Math.random`
+- Preuve : même chemin bcrypt pour e-mail inexistant et mot de passe faux ; tests de la fonction de sanitisation (`//evil.com`, `https://evil.com`, `/\evil.com`, `javascript:` → `/tableau-de-bord`) ; `tsc`/`lint`/`next build` OK
 
 ### 1.4 Secrets & supply chain
 - [x] Vérifié `git log -S <valeur SMTP_PASS>` → vide ; seul le nom `SMTP_PASS` apparaît dans `.env.example` (placeholder). `.env` jamais suivi.
@@ -136,6 +143,7 @@
 | 2026-11-06 | 3.2 CI/CD | `.github/CODEOWNERS`, `docs/CI-CD.md`, jobs CI vérifiés, build OK | Actions dashboard manuelles (GitHub/Vercel) documentées |
 | 2026-11-06 | 3.3 Infra Vercel | `next.config.ts` (CSP report-only), `app/api/csp-report/route.ts`, `docs/VERCEL-SECURITY.md`, `curl -I` + POST report OK, build OK | WAF/BotID/allowlist en dashboard ; CSP enforce après 2 sem. de monitoring (zod eval vu en report-only) |
 | 2026-11-07 | Vérification complète roadmap | Audit fichier par fichier + `tsc`/`lint`/`npm audit critical`/`next build` OK ; CI GitHub verte sur `cd919b9` (`check`, `Secrets`, `Analyze (actions)`, `Analyze (javascript-typescript)`) ; headers vérifiés via `next start` | Corrections : cookie OTP préfixé `__Secure-` en prod ; actions CI `checkout@v6`/`setup-node@v6`/`gitleaks@v3`/ZAP `v0.15.0` (runtime Node 24) ; roadmap alignée sur le Default setup CodeQL |
+| 2026-11-07 | 1.3 Anti-énumération connexion/OTP | `auth.ts` (`DUMMY_HASH` bcrypt valide), `mot-de-passe.ts` (cookie-leurre), `rejoindre.ts` (`compteExistant` révélé après OTP), `profil.ts` (OTP + rate limit + 5 essais), `app/connexion/page.tsx` (`sanitizeCallbackUrl`), toasts génériques, `app/error.tsx`/`app/global-error.tsx`, `crypto.randomInt` ; `tsc`/`lint`/`next build` OK | Aucun message ne distingue compte existant / inexistant avant preuve de possession de la boîte ; sanitisation testée sur `//evil.com`, `https://evil.com`, `/\evil.com`, `javascript:` |
 | | | | |
 
 ---

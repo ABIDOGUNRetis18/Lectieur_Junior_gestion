@@ -8,12 +8,38 @@ import { Suspense } from "react";
 import Image from "next/image";
 import { toastError } from "@/lib/toast";
 
+const DEFAULT_CALLBACK = "/tableau-de-bord";
+
+/**
+ * N'accepte qu'un chemin interne.
+ * Refuse les URL absolues, protocol-relative (`//evil.com`), les backslashes
+ * (normalisés en `/` par les navigateurs) et les caractères de contrôle.
+ */
+function sanitizeCallbackUrl(raw: string | null): string {
+  if (!raw) return DEFAULT_CALLBACK;
+  if (
+    !raw.startsWith("/") ||
+    raw.startsWith("//") ||
+    raw.includes("\\") ||
+    /[\u0000-\u001f\u007f]/.test(raw)
+  ) {
+    return DEFAULT_CALLBACK;
+  }
+  try {
+    const url = new URL(raw, "https://app.invalid");
+    if (url.origin !== "https://app.invalid") return DEFAULT_CALLBACK;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return DEFAULT_CALLBACK;
+  }
+}
+
 function ConnexionForm() {
   const router = useRouter();
   const params = useSearchParams();
   // "/tableau-de-bord" est l'URL commune : proxy.ts la redirige vers
   // /admin/tableau-de-bord ou /responsable/tableau-de-bord selon le rôle.
-  const callbackUrl = params.get("callbackUrl") ?? "/tableau-de-bord";
+  const callbackUrl = sanitizeCallbackUrl(params.get("callbackUrl"));
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");

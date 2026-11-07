@@ -12,7 +12,7 @@ import {
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
-  sendOtpEmail,
+  dispatchOtpEmail,
   verifyEmailDomain,
   type OtpPayload,
 } from "@/lib/otp";
@@ -70,15 +70,11 @@ export async function demanderInscriptionAction(
     return { ok: false, error: strengthJoin.error!, fieldErrors: { password: [strengthJoin.error!] } };
   }
 
-  // E-mail déjà utilisé
+  // Anti-énumération : on ne révèle pas si l'e-mail est déjà utilisé avant
+  // que le demandeur ait prouvé qu'il contrôle la boîte (code OTP).
+  // Un compte existant reçoit donc aussi un code ; l'information n'est donnée
+  // qu'à l'étape 2, après vérification du code.
   const existe = await prisma.user.findUnique({ where: { email } });
-  if (existe) {
-    return {
-      ok: false,
-      error: "Cet e-mail est déjà utilisé.",
-      fieldErrors: { email: ["E-mail déjà utilisé."] },
-    };
-  }
 
   // Vérifier que le domaine de l'e-mail peut recevoir des messages
   const domainOk = await verifyEmailDomain(email);
@@ -110,11 +106,13 @@ export async function demanderInscriptionAction(
       fraterniteId: data.fraterniteId,
       groupeId: fraternite.groupeId,
       passwordHash,
+      // Compte déjà existant : ne jamais créer de doublon à l'étape 2.
+      compteExistant: !!existe,
     },
   };
 
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(email, code);
+  const { devCode } = await dispatchOtpEmail(email, code);
 
   return {
     ok: true,
@@ -147,13 +145,19 @@ export async function verifierInscriptionOtpAction(code: string): Promise<Rejoin
     fraterniteId: string;
     groupeId: string;
     passwordHash: string;
+    compteExistant?: boolean;
   };
 
-  // Re-vérifier l'unicité (concurrence)
+  // Re-vérifier l'unicité (concurrence + compte existant au moment de la demande).
+  // Le message n'est révélé qu'après preuve de possession de la boîte e-mail.
   const existe = await prisma.user.findUnique({ where: { email: payload.email } });
-  if (existe) {
+  if (existe || d.compteExistant) {
     await clearOtpCookie();
-    return { ok: false, error: "Cet e-mail est déjà utilisé." };
+    return {
+      ok: false,
+      error:
+        "Un compte existe déjà avec cette adresse. Connectez-vous ou utilisez « Mot de passe oublié ».",
+    };
   }
 
   await prisma.user.create({
@@ -175,15 +179,26 @@ export async function verifierInscriptionOtpAction(code: string): Promise<Rejoin
 /** Renvoie un nouveau code (réutilise le payload existant). */
 export async function renvoyerOtpAction(): Promise<RejoindreResult> {
   const payload = await getOtpCookie();
-  if (!payload) {
+  if (!payload || payload.purpose !== "inscription") {
     return { ok: false, error: "Aucune demande en cours." };
   }
+
+  // Anti-spam : même limite que la demande initiale.
+  const limit = checkRateLimit(
+    `otp-inscription-resend:${payload.email}`,
+    3,
+    15 * 60 * 1000
+  );
+  if (!limit.allowed) {
+    return { ok: false, error: rateLimitMessage(limit.retryAfterSeconds) };
+  }
+
   const code = generateOtpCode();
   payload.code = hashOtpCode(code);
   payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(payload.email, code);
+  const { devCode } = await dispatchOtpEmail(payload.email, code);
   return { ok: true, message: "Un nouveau code a été envoyé.", devCode };
 }
 

@@ -18,10 +18,11 @@ import {
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
-  sendOtpEmail,
+  dispatchOtpEmail,
   verifyEmailDomain,
   type OtpPayload,
 } from "@/lib/otp";
+import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
 
 export type ProfilResult =
   | { ok: true; message: string; devCode?: string }
@@ -92,11 +93,15 @@ export async function demanderChangementEmailAction(
     return { ok: false, error: "C'est déjà votre adresse e-mail actuelle." };
   }
 
-  const existe = await prisma.user.findFirst({ where: { email, id: { not: userId } } });
-  if (existe) {
-    return { ok: false, error: "Cet e-mail est déjà utilisé par un autre compte." };
+  // Anti-spam : limite les demandes de code par utilisateur.
+  const limit = checkRateLimit(`otp-email-change:${userId}`, 3, 15 * 60 * 1000);
+  if (!limit.allowed) {
+    return { ok: false, error: rateLimitMessage(limit.retryAfterSeconds) };
   }
 
+  // Anti-énumération : on ne révèle pas ici si l'adresse appartient déjà à un
+  // autre compte. Le code est envoyé à l'adresse visée ; l'information n'est
+  // donnée qu'après vérification du code (preuve de possession de la boîte).
   const domainOk = await verifyEmailDomain(email);
   if (!domainOk) {
     return { ok: false, error: "Le domaine de cette adresse e-mail ne peut pas recevoir de messages." };
@@ -113,7 +118,7 @@ export async function demanderChangementEmailAction(
   };
 
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(email, code);
+  const { devCode } = await dispatchOtpEmail(email, code);
 
   return {
     ok: true,
@@ -133,7 +138,15 @@ export async function confirmerChangementEmailAction(code: string): Promise<Prof
     return { ok: false, error: "Aucune demande en cours ou code expiré." };
   }
   if (!verifyOtpCode(code, payload.code)) {
-    return { ok: false, error: "Code incorrect." };
+    // Max 5 essais, comme les autres flux OTP.
+    const attempts = (payload.attempts ?? 0) + 1;
+    if (attempts >= 5) {
+      await clearOtpCookie();
+      return { ok: false, error: "Trop de tentatives. Demande expirée, veuillez recommencer." };
+    }
+    payload.attempts = attempts;
+    await setOtpCookie(payload);
+    return { ok: false, error: `Code incorrect. (${attempts}/5 tentatives)` };
   }
 
   const newEmail = payload.email;
@@ -143,10 +156,16 @@ export async function confirmerChangementEmailAction(code: string): Promise<Prof
     return { ok: false, error: "Demande invalide." };
   }
 
+  // Révélé uniquement après validation du code : l'utilisateur a prouvé qu'il
+  // contrôle l'adresse visée. Avant cela, aucune information n'est divulguée.
   const existe = await prisma.user.findFirst({ where: { email: newEmail, id: { not: userId } } });
   if (existe) {
     await clearOtpCookie();
-    return { ok: false, error: "Cet e-mail est déjà utilisé." };
+    return {
+      ok: false,
+      error:
+        "Cette adresse est déjà associée à un autre compte. Utilisez une autre adresse ou connectez-vous au compte concerné.",
+    };
   }
 
   const avant = await prisma.user.findUnique({ where: { id: userId } });
@@ -231,15 +250,34 @@ export async function changerMotDePasseAction(
 
 /** Renvoie un nouveau code OTP pour le changement d'e-mail en cours. */
 export async function renvoyerOtpEmailAction(): Promise<ProfilResult> {
+  const session = await requireAuth();
   const payload = await getOtpCookie();
   if (!payload || payload.purpose !== "changement_email") {
     return { ok: false, error: "Aucune demande en cours." };
   }
+
+  // Le cookie doit appartenir à l'utilisateur connecté.
+  const d = payload.data as { userId?: string };
+  if (d.userId !== session.user.id) {
+    await clearOtpCookie();
+    return { ok: false, error: "Aucune demande en cours." };
+  }
+
+  // Anti-spam : même limite que la demande initiale.
+  const limit = checkRateLimit(
+    `otp-email-change-resend:${session.user.id}`,
+    3,
+    15 * 60 * 1000
+  );
+  if (!limit.allowed) {
+    return { ok: false, error: rateLimitMessage(limit.retryAfterSeconds) };
+  }
+
   const code = generateOtpCode();
   payload.code = hashOtpCode(code);
   payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(payload.email, code);
+  const { devCode } = await dispatchOtpEmail(payload.email, code);
   return { ok: true, message: "Un nouveau code a été envoyé.", devCode };
 }

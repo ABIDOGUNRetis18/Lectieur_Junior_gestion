@@ -12,7 +12,7 @@ import {
   setOtpCookie,
   getOtpCookie,
   clearOtpCookie,
-  sendOtpEmail,
+  dispatchOtpEmail,
   verifyEmailDomain,
   type OtpPayload,
 } from "@/lib/otp";
@@ -50,14 +50,10 @@ export async function demanderResetMotDePasseAction(emailRaw: string): Promise<M
     return { ok: false, error: rateLimitMessage(otpLimit.retryAfterSeconds), fieldErrors: { email: [rateLimitMessage(otpLimit.retryAfterSeconds)] } };
   }
 
+  // Anti-énumération : on ne révèle JAMAIS si l'e-mail correspond à un compte.
+  // Pour un compte inconnu, on pose un cookie-leurre avec un code aléatoire :
+  // l'étape 2 répond exactement comme pour un compte réel (même message).
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    return {
-      ok: false,
-      error: "Aucun compte trouvé avec cet e-mail.",
-      fieldErrors: { email: ["Aucun compte trouvé avec cet e-mail."] },
-    };
-  }
 
   const domainOk = await verifyEmailDomain(email);
   if (!domainOk) {
@@ -74,15 +70,20 @@ export async function demanderResetMotDePasseAction(emailRaw: string): Promise<M
     email,
     code: hashOtpCode(code),
     expiresAt: Date.now() + 10 * 60 * 1000,
-    data: { userId: user.id },
+    data: { userId: user?.id ?? "" },
   };
 
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(email, code);
+
+  let devCode: string | undefined;
+  if (user) {
+    ({ devCode } = await dispatchOtpEmail(email, code));
+  }
 
   return {
     ok: true,
-    message: "Un code de réinitialisation a été envoyé à votre adresse e-mail.",
+    message:
+      "Si un compte existe pour cette adresse, un code de réinitialisation a été envoyé.",
     devCode,
   };
 }
@@ -180,11 +181,28 @@ export async function renvoyerOtpResetAction(): Promise<MotDePasseResult> {
   if (!payload || payload.purpose !== "reset_password") {
     return { ok: false, error: "Aucune demande en cours." };
   }
+
+  // Anti-spam : même limite que la demande initiale.
+  const limit = checkRateLimit(
+    `otp-reset-resend:${payload.email}`,
+    3,
+    15 * 60 * 1000
+  );
+  if (!limit.allowed) {
+    return { ok: false, error: rateLimitMessage(limit.retryAfterSeconds) };
+  }
+
   const code = generateOtpCode();
   payload.code = hashOtpCode(code);
   payload.attempts = 0;
   payload.expiresAt = Date.now() + 10 * 60 * 1000;
   await setOtpCookie(payload);
-  const { devCode } = await sendOtpEmail(payload.email, code);
+
+  // Cookie-leurre (compte inconnu) : ne pas envoyer d'e-mail à un tiers.
+  const userId = (payload.data as { userId?: string }).userId;
+  let devCode: string | undefined;
+  if (userId) {
+    ({ devCode } = await dispatchOtpEmail(payload.email, code));
+  }
   return { ok: true, message: "Un nouveau code a été envoyé.", devCode };
 }

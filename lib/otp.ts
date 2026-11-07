@@ -6,6 +6,7 @@ import net from "net";
 import tls from "tls";
 import { promisify } from "util";
 import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { logger } from "@/lib/logger";
 
 // Préfixe __Secure- en production (cookie refusé si posé sans Secure / hors HTTPS).
@@ -23,7 +24,7 @@ const resolveMx = promisify(dns.resolveMx);
 
 /** Génère un code OTP à 6 chiffres (en clair, jamais stocké). */
 export function generateOtpCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 /** Hash SHA-256 d'un code OTP (stocké dans le cookie chiffré, jamais le clair). */
@@ -410,10 +411,41 @@ export async function sendOtpEmail(
     }
   }
 
-  // Fallback dev : log dans la console + renvoyer le code au client
-  // Ne jamais logger le code en production (ici uniquement si SMTP absent + dev)
+  // Fallback dev uniquement : le code n'est renvoyé au client QUE hors production.
   if (process.env.NODE_ENV !== "production") {
     console.log(`[OTP DEV] ${email} → ${code}`);
+    return { devCode: code };
   }
-  return { devCode: code };
+
+  // Production sans SMTP configuré : ne JAMAIS renvoyer le code au navigateur
+  // (sinon n'importe qui pourrait réinitialiser n'importe quel compte).
+  logger.error("smtp_not_configured", {
+    emailDomain: email.split("@")[1] ?? null,
+  });
+  throw new Error("Service d'envoi d'e-mail indisponible.");
+}
+
+/**
+ * Envoie un OTP sans bloquer la réponse HTTP en production.
+ * Objectif : le temps de réponse ne doit pas révéler si le compte existe
+ * (l'envoi SMTP, lent et variable, est planifié après la réponse via `after`).
+ * En dev, on attend pour pouvoir afficher le code dans l'UI.
+ */
+export async function dispatchOtpEmail(
+  email: string,
+  code: string
+): Promise<{ devCode?: string }> {
+  if (process.env.NODE_ENV !== "production") {
+    return sendOtpEmail(email, code);
+  }
+
+  after(async () => {
+    try {
+      await sendOtpEmail(email, code);
+    } catch {
+      // Déjà loggé dans sendOtpEmail — jamais remonté au client.
+    }
+  });
+
+  return {};
 }
